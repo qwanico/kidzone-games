@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 
-WIDTH, HEIGHT = 1000, 1350
+WIDTH, HEIGHT = 1000, 1650
 CARD_W, CARD_H = 280, 260
 CARD_GAP = 40
 COLS = 3
@@ -139,6 +139,26 @@ GAMES = [
         "color": (70, 200, 220),
         "hover": (55, 175, 195),
         "image": GAMES_DIR / "BalloonPop" / "assets" / "balloonpop_icon.png",
+    },
+    {
+        "name": "Maze",
+        "comment": "Guide the hero\nthrough the maze!",
+        "python": GAMES_DIR / "Maze" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Maze" / "maze.py",
+        "cwd": GAMES_DIR / "Maze",
+        "color": (110, 120, 135),
+        "hover": (90, 100, 115),
+        "image": ICONS_DIR / "maze.png",
+    },
+    {
+        "name": "Simon Pattern",
+        "comment": "Watch the pattern,\nthen click it back!",
+        "python": GAMES_DIR / "SimonPattern" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "SimonPattern" / "simon_pattern.py",
+        "cwd": GAMES_DIR / "SimonPattern",
+        "color": (180, 50, 130),
+        "hover": (160, 35, 112),
+        "image": ICONS_DIR / "simon_pattern.png",
     },
 ]
 
