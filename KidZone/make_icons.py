@@ -148,10 +148,83 @@ def draw_math_icon():
     pygame.image.save(surf, str(OUT / "math.png"))
 
 
+def draw_maze_icon():
+    surf = new_surface()
+    wall_color = (110, 120, 135)
+    path_color = (255, 255, 255)
+    goal_color = (255, 205, 60)
+    player_color = (90, 160, 230)
+
+    board = pygame.Rect(14, 14, SIZE - 28, SIZE - 28)
+    pygame.draw.rect(surf, wall_color, board, border_radius=18)
+    inner = board.inflate(-16, -16)
+    pygame.draw.rect(surf, path_color, inner, border_radius=12)
+
+    # staggered interior wall segments that read as maze corridors
+    # (offset from one another so they don't form a symmetric cross)
+    seg_color = wall_color
+    ox, oy = inner.left, inner.top
+    pygame.draw.rect(surf, seg_color, pygame.Rect(ox + 44, oy + 10, 14, 70), border_radius=6)
+    pygame.draw.rect(surf, seg_color, pygame.Rect(ox + 80, oy + 70, 80, 14), border_radius=6)
+    pygame.draw.rect(surf, seg_color, pygame.Rect(ox + 138, oy + 100, 14, 66), border_radius=6)
+    pygame.draw.rect(surf, seg_color, pygame.Rect(ox + 20, oy + 140, 68, 14), border_radius=6)
+
+    # player circle near the start (top-left)
+    player_center = (inner.left + 20, inner.top + 20)
+    pygame.draw.circle(surf, player_color, player_center, 18)
+    pygame.draw.circle(surf, (60, 130, 200), player_center, 18, width=3)
+
+    # goal star near the bottom-right
+    cx, cy = inner.right - 22, inner.bottom - 22
+    points = []
+    radius = 22
+    import math as _m
+    for i in range(10):
+        angle = -_m.pi / 2 + i * _m.pi / 5
+        r = radius if i % 2 == 0 else radius * 0.45
+        points.append((cx + _m.cos(angle) * r, cy + _m.sin(angle) * r))
+    pygame.draw.polygon(surf, goal_color, points)
+    pygame.draw.polygon(surf, (255, 255, 255), points, width=2)
+
+    pygame.image.save(surf, str(OUT / "maze.png"))
+
+
+def draw_simon_pattern_icon():
+    surf = new_surface()
+    quad_colors = [
+        (70, 180, 90),   # green, top-left
+        (215, 70, 70),   # red, top-right
+        (235, 195, 40),  # yellow, bottom-left
+        (60, 120, 215),  # blue, bottom-right
+    ]
+    cell = 104
+    gap = 12
+    grid_w = cell * 2 + gap
+    start_x = (SIZE - grid_w) // 2
+    start_y = (SIZE - grid_w) // 2
+    for i, color in enumerate(quad_colors):
+        row, col = divmod(i, 2)
+        rect = pygame.Rect(
+            start_x + col * (cell + gap), start_y + row * (cell + gap), cell, cell
+        )
+        pygame.draw.rect(surf, color, rect, border_radius=20)
+        pygame.draw.rect(surf, (255, 255, 255), rect, width=4, border_radius=20)
+    # highlight ring on the top-right (red) panel to suggest "lit up"
+    lit_rect = pygame.Rect(start_x + cell + gap, start_y, cell, cell)
+    glow = pygame.Surface((cell + 24, cell + 24), pygame.SRCALPHA)
+    pygame.draw.rect(glow, (255, 255, 255, 130), glow.get_rect(), border_radius=26)
+    surf.blit(glow, (lit_rect.left - 12, lit_rect.top - 12))
+    pygame.draw.rect(surf, (255, 150, 150), lit_rect, border_radius=20)
+    pygame.draw.rect(surf, (255, 255, 255), lit_rect, width=4, border_radius=20)
+    pygame.image.save(surf, str(OUT / "simon_pattern.png"))
+
+
 draw_letters_icon()
 draw_sight_words_icon()
 draw_shapes_icon()
 draw_counting_icon()
 draw_colors_icon()
 draw_math_icon()
+draw_maze_icon()
+draw_simon_pattern_icon()
 print("done")

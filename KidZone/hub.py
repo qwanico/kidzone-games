@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 
-WIDTH, HEIGHT = 1000, 1950
+WIDTH, HEIGHT = 1000, 2250
 CARD_W, CARD_H = 280, 260
 CARD_GAP = 40
 COLS = 3
@@ -176,8 +176,8 @@ GAMES = [
         "python": GAMES_DIR / "MemoryMatch" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "MemoryMatch" / "memory_match.py",
         "cwd": GAMES_DIR / "MemoryMatch",
-        "color": (110, 100, 200),
-        "hover": (90, 82, 180),
+        "color": (200, 90, 150),
+        "hover": (180, 72, 132),
         "image": GAMES_DIR / "MemoryMatch" / "assets" / "memorymatch_icon.png",
     },
     {
@@ -186,9 +186,29 @@ GAMES = [
         "python": GAMES_DIR / "JumpingJack" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "JumpingJack" / "jumping_jack.py",
         "cwd": GAMES_DIR / "JumpingJack",
-        "color": (230, 150, 60),
-        "hover": (210, 130, 45),
+        "color": (221, 235, 100),
+        "hover": (200, 215, 85),
         "image": GAMES_DIR / "JumpingJack" / "assets" / "jumpingjack_icon.png",
+    },
+    {
+        "name": "Maze",
+        "comment": "Guide the hero\nthrough the maze!",
+        "python": GAMES_DIR / "Maze" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Maze" / "maze.py",
+        "cwd": GAMES_DIR / "Maze",
+        "color": (110, 120, 135),
+        "hover": (90, 100, 115),
+        "image": ICONS_DIR / "maze.png",
+    },
+    {
+        "name": "Simon Pattern",
+        "comment": "Watch the pattern,\nthen click it back!",
+        "python": GAMES_DIR / "SimonPattern" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "SimonPattern" / "simon_pattern.py",
+        "cwd": GAMES_DIR / "SimonPattern",
+        "color": (180, 50, 130),
+        "hover": (160, 35, 112),
+        "image": ICONS_DIR / "simon_pattern.png",
     },
 ]
 
