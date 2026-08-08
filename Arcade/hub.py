@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 
-WIDTH, HEIGHT = 1100, 900
+WIDTH, HEIGHT = 1100, 960
 CARD_W, CARD_H = 250, 230
 CARD_GAP = 36
 COLS = 4
@@ -19,7 +19,108 @@ TEXT_COLOR = (225, 228, 240)
 TITLE_COLOR = (120, 220, 255)
 SUBTITLE_COLOR = (150, 155, 180)
 
-GAMES = []
+GAMES = [
+    {
+        "name": "Pong",
+        "comment": "Classic paddle battle\nagainst the AI!",
+        "python": GAMES_DIR / "Pong" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Pong" / "pong.py",
+        "cwd": GAMES_DIR / "Pong",
+        "color": (232, 232, 233),
+        "hover": (210, 210, 212),
+        "image": GAMES_DIR / "Pong" / "assets" / "pong_icon.png",
+    },
+    {
+        "name": "Space Invaders",
+        "comment": "Blast the alien fleet\nbefore they land!",
+        "python": GAMES_DIR / "SpaceInvaders" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "SpaceInvaders" / "space_invaders.py",
+        "cwd": GAMES_DIR / "SpaceInvaders",
+        "color": (235, 235, 80),
+        "hover": (215, 215, 60),
+        "image": GAMES_DIR / "SpaceInvaders" / "assets" / "spaceinvaders_icon.png",
+    },
+    {
+        "name": "Asteroids",
+        "comment": "Rotate, thrust, and\nblast the rocks!",
+        "python": GAMES_DIR / "Asteroids" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Asteroids" / "asteroids.py",
+        "cwd": GAMES_DIR / "Asteroids",
+        "color": (117, 233, 37),
+        "hover": (97, 213, 20),
+        "image": GAMES_DIR / "Asteroids" / "assets" / "asteroids_icon.png",
+    },
+    {
+        "name": "Tetris",
+        "comment": "Stack the falling\nblocks and clear lines!",
+        "python": GAMES_DIR / "Tetris" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Tetris" / "tetris.py",
+        "cwd": GAMES_DIR / "Tetris",
+        "color": (227, 115, 235),
+        "hover": (207, 95, 215),
+        "image": GAMES_DIR / "Tetris" / "assets" / "tetris_icon.png",
+    },
+    {
+        "name": "Connect Four",
+        "comment": "Drop discs and get\n4 in a row to win!",
+        "python": GAMES_DIR / "ConnectFour" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "ConnectFour" / "connect_four.py",
+        "cwd": GAMES_DIR / "ConnectFour",
+        "color": (143, 233, 159),
+        "hover": (123, 213, 139),
+        "image": GAMES_DIR / "ConnectFour" / "assets" / "connectfour_icon.png",
+    },
+    {
+        "name": "Minesweeper",
+        "comment": "Clear the board without\nhitting a mine!",
+        "python": GAMES_DIR / "Minesweeper" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Minesweeper" / "minesweeper.py",
+        "cwd": GAMES_DIR / "Minesweeper",
+        "color": (43, 36, 234),
+        "hover": (34, 28, 210),
+        "image": GAMES_DIR / "Minesweeper" / "assets" / "minesweeper_icon.png",
+    },
+    {
+        "name": "Pinball",
+        "comment": "Flip the flippers,\nrack up the score!",
+        "python": GAMES_DIR / "Pinball" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Pinball" / "pinball.py",
+        "cwd": GAMES_DIR / "Pinball",
+        "color": (37, 235, 133),
+        "hover": (28, 213, 115),
+        "image": GAMES_DIR / "Pinball" / "assets" / "pinball_icon.png",
+    },
+    {
+        "name": "Typing Speed Test",
+        "comment": "How fast can you\ntype the phrase?",
+        "python": GAMES_DIR / "TypingTest" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "TypingTest" / "typing_test.py",
+        "cwd": GAMES_DIR / "TypingTest",
+        "color": (40, 234, 233),
+        "hover": (30, 213, 212),
+        "image": GAMES_DIR / "TypingTest" / "assets" / "typingtest_icon.png",
+    },
+    {
+        "name": "Archery",
+        "comment": "Aim, charge power,\nand hit the bullseye!",
+        "python": GAMES_DIR / "Archery" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Archery" / "archery.py",
+        "cwd": GAMES_DIR / "Archery",
+        "color": (224, 171, 154),
+        "hover": (204, 151, 134),
+        "image": GAMES_DIR / "Archery" / "assets" / "archery_icon.png",
+    },
+    {
+        "name": "Trivia",
+        "comment": "Answer questions and\ntest your knowledge!",
+        "python": GAMES_DIR / "Trivia" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Trivia" / "trivia.py",
+        "cwd": GAMES_DIR / "Trivia",
+        "color": (137, 36, 40),
+        "hover": (117, 28, 32),
+        "image": GAMES_DIR / "Trivia" / "assets" / "trivia_icon.png",
+    },
+]
 
 
 class Card:
