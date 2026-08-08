@@ -1,0 +1,11 @@
+gameenv/
+pygbag_env/
+_kidzoneweb_testenv/
+__pycache__/
+*.pyc
+*.log
+build/
+progress.json
+voice_cache/
+tile_cache/
+.claude/settings.local.json

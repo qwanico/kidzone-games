@@ -1,0 +1,846 @@
+{
+  "angry": [
+    {
+      "file": "angry_000.png",
+      "duration": 360
+    },
+    {
+      "file": "angry_001.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_002.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_003.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_004.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_005.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_006.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_007.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_008.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_009.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_010.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_011.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_012.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_013.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_014.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_015.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_016.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_017.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_018.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_019.png",
+      "duration": 60
+    },
+    {
+      "file": "angry_020.png",
+      "duration": 900
+    }
+  ],
+  "excited": [
+    {
+      "file": "excited_000.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_001.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_002.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_003.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_004.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_005.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_006.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_007.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_008.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_009.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_010.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_011.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_012.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_013.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_014.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_015.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_016.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_017.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_018.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_019.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_020.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_021.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_022.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_023.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_024.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_025.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_026.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_027.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_028.png",
+      "duration": 60
+    },
+    {
+      "file": "excited_029.png",
+      "duration": 60
+    }
+  ],
+  "happy": [
+    {
+      "file": "happy_000.png",
+      "duration": 120
+    },
+    {
+      "file": "happy_001.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_002.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_003.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_004.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_005.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_006.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_007.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_008.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_009.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_010.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_011.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_012.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_013.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_014.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_015.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_016.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_017.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_018.png",
+      "duration": 780
+    },
+    {
+      "file": "happy_019.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_020.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_021.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_022.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_023.png",
+      "duration": 60
+    },
+    {
+      "file": "happy_024.png",
+      "duration": 60
+    }
+  ],
+  "sad": [
+    {
+      "file": "sad_000.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_001.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_002.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_003.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_004.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_005.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_006.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_007.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_008.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_009.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_010.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_011.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_012.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_013.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_014.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_015.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_016.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_017.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_018.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_019.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_020.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_021.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_022.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_023.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_024.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_025.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_026.png",
+      "duration": 60
+    },
+    {
+      "file": "sad_027.png",
+      "duration": 60
+    }
+  ],
+  "scared": [
+    {
+      "file": "scared_000.png",
+      "duration": 300
+    },
+    {
+      "file": "scared_001.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_002.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_003.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_004.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_005.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_006.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_007.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_008.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_009.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_010.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_011.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_012.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_013.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_014.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_015.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_016.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_017.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_018.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_019.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_020.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_021.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_022.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_023.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_024.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_025.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_026.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_027.png",
+      "duration": 60
+    },
+    {
+      "file": "scared_028.png",
+      "duration": 60
+    }
+  ],
+  "silly": [
+    {
+      "file": "silly_000.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_001.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_002.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_003.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_004.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_005.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_006.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_007.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_008.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_009.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_010.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_011.png",
+      "duration": 360
+    },
+    {
+      "file": "silly_012.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_013.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_014.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_015.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_016.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_017.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_018.png",
+      "duration": 60
+    },
+    {
+      "file": "silly_019.png",
+      "duration": 60
+    }
+  ],
+  "surprised": [
+    {
+      "file": "surprised_000.png",
+      "duration": 300
+    },
+    {
+      "file": "surprised_001.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_002.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_003.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_004.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_005.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_006.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_007.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_008.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_009.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_010.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_011.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_012.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_013.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_014.png",
+      "duration": 1080
+    },
+    {
+      "file": "surprised_015.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_016.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_017.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_018.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_019.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_020.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_021.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_022.png",
+      "duration": 60
+    },
+    {
+      "file": "surprised_023.png",
+      "duration": 60
+    }
+  ],
+  "tired": [
+    {
+      "file": "tired_000.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_001.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_002.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_003.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_004.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_005.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_006.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_007.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_008.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_009.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_010.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_011.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_012.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_013.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_014.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_015.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_016.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_017.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_018.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_019.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_020.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_021.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_022.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_023.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_024.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_025.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_026.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_027.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_028.png",
+      "duration": 60
+    },
+    {
+      "file": "tired_029.png",
+      "duration": 60
+    }
+  ]
+}

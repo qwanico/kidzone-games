@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m py_compile fruit_finder.py)",
+      "Bash(timeout -s KILL 8 /home/nico/FruitFinder/venv/bin/python /tmp/claude-1000/-home-nico-FruitFinder/b276e024-211c-4043-8443-3589dbc62c34/scratchpad/test_tts.py 2>&1)",
+      "Bash(DISPLAY=:0 import -window \"Fruit Finder\" /tmp/claude-1000/-home-nico-FruitFinder/b276e024-211c-4043-8443-3589dbc62c34/scratchpad/game_screenshot.png)",
+      "Bash(echo \"exit:$?\")"
+    ]
+  }
+}
