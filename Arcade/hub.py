@@ -106,8 +106,8 @@ GAMES = [
         "python": GAMES_DIR / "WordScramble" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "WordScramble" / "word_scramble.py",
         "cwd": GAMES_DIR / "WordScramble",
-        "color": (100, 105, 130),
-        "hover": (82, 87, 112),
+        "color": (80, 150, 140),
+        "hover": (64, 130, 120),
         "image": GAMES_DIR / "WordScramble" / "assets" / "wordscramble_icon.png",
     },
     {
