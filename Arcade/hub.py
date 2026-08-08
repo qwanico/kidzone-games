@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 
-WIDTH, HEIGHT = 1100, 900
+WIDTH, HEIGHT = 1100, 1000
 CARD_W, CARD_H = 250, 230
 CARD_GAP = 36
 COLS = 4
@@ -19,7 +19,108 @@ TEXT_COLOR = (225, 228, 240)
 TITLE_COLOR = (120, 220, 255)
 SUBTITLE_COLOR = (150, 155, 180)
 
-GAMES = []
+GAMES = [
+    {
+        "name": "Snake",
+        "comment": "Eat food, grow long,\ndon't hit yourself!",
+        "python": GAMES_DIR / "Snake" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Snake" / "snake.py",
+        "cwd": GAMES_DIR / "Snake",
+        "color": (60, 140, 95),
+        "hover": (48, 120, 78),
+        "image": GAMES_DIR / "Snake" / "assets" / "snake_icon.png",
+    },
+    {
+        "name": "Breakout",
+        "comment": "Bounce the ball,\nbreak every brick!",
+        "python": GAMES_DIR / "Breakout" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Breakout" / "breakout.py",
+        "cwd": GAMES_DIR / "Breakout",
+        "color": (90, 100, 160),
+        "hover": (72, 82, 140),
+        "image": GAMES_DIR / "Breakout" / "assets" / "breakout_icon.png",
+    },
+    {
+        "name": "Flappy Bird",
+        "comment": "Flap through the\npipes without hitting!",
+        "python": GAMES_DIR / "FlappyBird" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "FlappyBird" / "flappy_bird.py",
+        "cwd": GAMES_DIR / "FlappyBird",
+        "color": (70, 150, 190),
+        "hover": (55, 130, 170),
+        "image": GAMES_DIR / "FlappyBird" / "assets" / "flappybird_icon.png",
+    },
+    {
+        "name": "2048",
+        "comment": "Slide and merge tiles\nto reach 2048!",
+        "python": GAMES_DIR / "Game2048" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Game2048" / "game_2048.py",
+        "cwd": GAMES_DIR / "Game2048",
+        "color": (150, 120, 90),
+        "hover": (130, 102, 74),
+        "image": GAMES_DIR / "Game2048" / "assets" / "game2048_icon.png",
+    },
+    {
+        "name": "Tic-Tac-Toe",
+        "comment": "Outsmart the AI\nin classic X's and O's!",
+        "python": GAMES_DIR / "TicTacToe" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "TicTacToe" / "tic_tac_toe.py",
+        "cwd": GAMES_DIR / "TicTacToe",
+        "color": (70, 76, 100),
+        "hover": (56, 62, 84),
+        "image": GAMES_DIR / "TicTacToe" / "assets" / "tictactoe_icon.png",
+    },
+    {
+        "name": "Reaction Timer",
+        "comment": "How fast are your\nreflexes? Test them!",
+        "python": GAMES_DIR / "ReactionTimer" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "ReactionTimer" / "reaction_timer.py",
+        "cwd": GAMES_DIR / "ReactionTimer",
+        "color": (150, 70, 160),
+        "hover": (130, 56, 140),
+        "image": GAMES_DIR / "ReactionTimer" / "assets" / "reactiontimer_icon.png",
+    },
+    {
+        "name": "Rock Paper Scissors",
+        "comment": "Beat the computer\nin best of rounds!",
+        "python": GAMES_DIR / "RockPaperScissors" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "RockPaperScissors" / "rock_paper_scissors.py",
+        "cwd": GAMES_DIR / "RockPaperScissors",
+        "color": (190, 110, 70),
+        "hover": (170, 92, 55),
+        "image": GAMES_DIR / "RockPaperScissors" / "assets" / "rockpaperscissors_icon.png",
+    },
+    {
+        "name": "Air Hockey",
+        "comment": "Score goals against\nthe AI paddle!",
+        "python": GAMES_DIR / "AirHockey" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "AirHockey" / "air_hockey.py",
+        "cwd": GAMES_DIR / "AirHockey",
+        "color": (40, 90, 130),
+        "hover": (30, 74, 110),
+        "image": GAMES_DIR / "AirHockey" / "assets" / "airhockey_icon.png",
+    },
+    {
+        "name": "Word Scramble",
+        "comment": "Unscramble the\nletters to spell it!",
+        "python": GAMES_DIR / "WordScramble" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "WordScramble" / "word_scramble.py",
+        "cwd": GAMES_DIR / "WordScramble",
+        "color": (100, 105, 130),
+        "hover": (82, 87, 112),
+        "image": GAMES_DIR / "WordScramble" / "assets" / "wordscramble_icon.png",
+    },
+    {
+        "name": "Color Switch",
+        "comment": "Stack the blocks,\ndon't miss the edge!",
+        "python": GAMES_DIR / "ColorSwitch" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "ColorSwitch" / "color_switch.py",
+        "cwd": GAMES_DIR / "ColorSwitch",
+        "color": (170, 90, 130),
+        "hover": (150, 74, 112),
+        "image": GAMES_DIR / "ColorSwitch" / "assets" / "colorswitch_icon.png",
+    },
+]
 
 
 class Card:
