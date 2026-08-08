@@ -128,9 +128,30 @@ def draw_colors_icon():
     pygame.image.save(surf, str(OUT / "colors.png"))
 
 
+def draw_math_icon():
+    surf = new_surface()
+    font_big = pygame.font.SysFont(None, 90, bold=True)
+    font_small = pygame.font.SysFont(None, 64, bold=True)
+
+    blocks = [
+        ("3", (120, 180, 40), (20, 70)),
+        ("+", (240, 170, 60), (90, 30)),
+        ("2", (110, 180, 220), (150, 90)),
+    ]
+    for label, color, pos in blocks:
+        rect = pygame.Rect(pos[0], pos[1], 90, 90)
+        pygame.draw.rect(surf, color, rect, border_radius=16)
+        pygame.draw.rect(surf, (255, 255, 255), rect, width=4, border_radius=16)
+        font = font_small if label == "+" else font_big
+        text = font.render(label, True, (255, 255, 255))
+        surf.blit(text, text.get_rect(center=rect.center))
+    pygame.image.save(surf, str(OUT / "math.png"))
+
+
 draw_letters_icon()
 draw_sight_words_icon()
 draw_shapes_icon()
 draw_counting_icon()
 draw_colors_icon()
+draw_math_icon()
 print("done")

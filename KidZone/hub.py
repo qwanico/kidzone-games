@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 
-WIDTH, HEIGHT = 1000, 1050
+WIDTH, HEIGHT = 1000, 1350
 CARD_W, CARD_H = 280, 260
 CARD_GAP = 40
 COLS = 3
@@ -109,6 +109,36 @@ GAMES = [
         "color": (215, 70, 70),
         "hover": (195, 55, 55),
         "image": ICONS_DIR / "colors.png",
+    },
+    {
+        "name": "Math",
+        "comment": "Listen, then click\nthe answer you hear!",
+        "python": GAMES_DIR / "Math" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "Math" / "math_game.py",
+        "cwd": GAMES_DIR / "Math",
+        "color": (120, 180, 40),
+        "hover": (100, 160, 30),
+        "image": ICONS_DIR / "math.png",
+    },
+    {
+        "name": "Whack-a-Mole",
+        "comment": "Click the moles\nbefore they hide!",
+        "python": GAMES_DIR / "WhackAMole" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "WhackAMole" / "whack_a_mole.py",
+        "cwd": GAMES_DIR / "WhackAMole",
+        "color": (140, 100, 70),
+        "hover": (120, 82, 55),
+        "image": GAMES_DIR / "WhackAMole" / "assets" / "whackamole_icon.png",
+    },
+    {
+        "name": "Balloon Pop",
+        "comment": "Pop balloons, dodge\nthe bombs!",
+        "python": GAMES_DIR / "BalloonPop" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "BalloonPop" / "balloon_pop.py",
+        "cwd": GAMES_DIR / "BalloonPop",
+        "color": (70, 200, 220),
+        "hover": (55, 175, 195),
+        "image": GAMES_DIR / "BalloonPop" / "assets" / "balloonpop_icon.png",
     },
 ]
 
