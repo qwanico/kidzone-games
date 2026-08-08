@@ -8,11 +8,16 @@ BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 
-WIDTH, HEIGHT = 1100, 1550
+WIDTH, HEIGHT = 1100, 800
 CARD_W, CARD_H = 250, 230
 CARD_GAP = 36
 COLS = 4
 IMAGE_SIZE = 96
+TOP_Y = 150
+BOTTOM_MARGIN = 40
+SCROLL_SPEED = 60
+SCROLLBAR_COLOR = (50, 54, 70)
+SCROLLBAR_THUMB_COLOR = (100, 106, 130)
 
 BG_COLOR = (24, 26, 38)
 TEXT_COLOR = (225, 228, 240)
@@ -233,7 +238,6 @@ class Card:
 
 
 def layout_cards():
-    top_y = 150
     cards = []
     for i, game in enumerate(GAMES):
         row, col = divmod(i, COLS)
@@ -243,9 +247,15 @@ def layout_cards():
         row_start_x = (WIDTH - row_w) // 2
 
         x = row_start_x + col * (CARD_W + CARD_GAP)
-        y = top_y + row * (CARD_H + CARD_GAP)
+        y = TOP_Y + row * (CARD_H + CARD_GAP)
         cards.append(Card(game, (x, y, CARD_W, CARD_H)))
     return cards
+
+
+def content_height(cards):
+    if not cards:
+        return TOP_Y
+    return max(card.rect.bottom for card in cards) + BOTTOM_MARGIN
 
 
 def launch_game(game):
@@ -278,19 +288,28 @@ def main():
     comment_font = pygame.font.SysFont(None, 20)
 
     cards = layout_cards()
+    max_scroll = max(0, content_height(cards) - HEIGHT)
+    scroll = 0
     running = True
 
     while running:
         mouse_pos = pygame.mouse.get_pos()
+        mouse_content_pos = (mouse_pos[0], mouse_pos[1] + scroll)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+                scroll = min(scroll + SCROLL_SPEED, max_scroll)
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+                scroll = max(scroll - SCROLL_SPEED, 0)
+            elif event.type == pygame.MOUSEWHEEL:
+                scroll = max(0, min(scroll - event.y * SCROLL_SPEED, max_scroll))
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 for card in cards:
-                    if card.is_hovered(event.pos):
+                    if card.is_hovered(mouse_content_pos):
                         pygame.display.quit()
                         pygame.mixer.quit()
                         launch_game(card.game)
@@ -300,29 +319,30 @@ def main():
                         load_images()
                         break
 
-        screen.fill(BG_COLOR)
+        content = pygame.Surface((WIDTH, content_height(cards)))
+        content.fill(BG_COLOR)
 
         title_surf = title_font.render("Arcade", True, TITLE_COLOR)
-        screen.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, 60)))
+        content.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, 60)))
         subtitle_surf = subtitle_font.render(
             "Pick a game to play!", True, SUBTITLE_COLOR
         )
-        screen.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 100)))
+        content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 100)))
 
         for card in cards:
-            hovered = card.is_hovered(mouse_pos)
+            hovered = card.is_hovered(mouse_content_pos)
             color = card.game["hover"] if hovered else card.game["color"]
             rect = card.rect.inflate(6, 6) if hovered else card.rect
-            pygame.draw.rect(screen, color, rect, border_radius=14)
-            pygame.draw.rect(screen, (60, 64, 84), rect, width=2, border_radius=14)
+            pygame.draw.rect(content, color, rect, border_radius=14)
+            pygame.draw.rect(content, (60, 64, 84), rect, width=2, border_radius=14)
 
             image = card.game["image_surface"]
             img_top = rect.top + 16
-            screen.blit(image, image.get_rect(midtop=(rect.centerx, img_top)))
+            content.blit(image, image.get_rect(midtop=(rect.centerx, img_top)))
 
             name_top = img_top + IMAGE_SIZE + 10
             name_surf = name_font.render(card.game["name"], True, TEXT_COLOR)
-            screen.blit(
+            content.blit(
                 name_surf, name_surf.get_rect(midtop=(rect.centerx, name_top))
             )
 
@@ -330,12 +350,24 @@ def main():
             lines = card.game["comment"].split("\n")
             for i, line in enumerate(lines):
                 line_surf = comment_font.render(line, True, (200, 204, 220))
-                screen.blit(
+                content.blit(
                     line_surf,
                     line_surf.get_rect(
                         midtop=(rect.centerx, comment_top + i * 20)
                     ),
                 )
+
+        screen.fill(BG_COLOR)
+        screen.blit(content, (0, -scroll))
+
+        if max_scroll > 0:
+            track_x = WIDTH - 14
+            pygame.draw.rect(screen, SCROLLBAR_COLOR, (track_x, 0, 8, HEIGHT), border_radius=4)
+            thumb_h = max(30, HEIGHT * HEIGHT // content_height(cards))
+            thumb_y = int(scroll / max_scroll * (HEIGHT - thumb_h)) if max_scroll else 0
+            pygame.draw.rect(
+                screen, SCROLLBAR_THUMB_COLOR, (track_x, thumb_y, 8, thumb_h), border_radius=4
+            )
 
         pygame.display.flip()
         clock.tick(60)
