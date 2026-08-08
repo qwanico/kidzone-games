@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 
-WIDTH, HEIGHT = 1000, 1350
+WIDTH, HEIGHT = 1000, 1950
 CARD_W, CARD_H = 280, 260
 CARD_GAP = 40
 COLS = 3
@@ -139,6 +139,56 @@ GAMES = [
         "color": (70, 200, 220),
         "hover": (55, 175, 195),
         "image": GAMES_DIR / "BalloonPop" / "assets" / "balloonpop_icon.png",
+    },
+    {
+        "name": "Bug Squasher",
+        "comment": "Click the bugs before\nthey scurry away!",
+        "python": GAMES_DIR / "BugSquasher" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "BugSquasher" / "bug_squasher.py",
+        "cwd": GAMES_DIR / "BugSquasher",
+        "color": (110, 140, 80),
+        "hover": (92, 122, 64),
+        "image": GAMES_DIR / "BugSquasher" / "assets" / "bugsquasher_icon.png",
+    },
+    {
+        "name": "Fish Catch",
+        "comment": "Click the fish, avoid\nthe junk!",
+        "python": GAMES_DIR / "FishCatch" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "FishCatch" / "fish_catch.py",
+        "cwd": GAMES_DIR / "FishCatch",
+        "color": (40, 120, 190),
+        "hover": (30, 100, 170),
+        "image": GAMES_DIR / "FishCatch" / "assets" / "fishcatch_icon.png",
+    },
+    {
+        "name": "Star Catcher",
+        "comment": "Catch falling stars,\ndodge the rocks!",
+        "python": GAMES_DIR / "StarCatcher" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "StarCatcher" / "star_catcher.py",
+        "cwd": GAMES_DIR / "StarCatcher",
+        "color": (60, 55, 110),
+        "hover": (45, 42, 90),
+        "image": GAMES_DIR / "StarCatcher" / "assets" / "starcatcher_icon.png",
+    },
+    {
+        "name": "Memory Match",
+        "comment": "Flip cards to find\nmatching pairs!",
+        "python": GAMES_DIR / "MemoryMatch" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "MemoryMatch" / "memory_match.py",
+        "cwd": GAMES_DIR / "MemoryMatch",
+        "color": (110, 100, 200),
+        "hover": (90, 82, 180),
+        "image": GAMES_DIR / "MemoryMatch" / "assets" / "memorymatch_icon.png",
+    },
+    {
+        "name": "Jumping Jack",
+        "comment": "Jump over obstacles\nto keep the score up!",
+        "python": GAMES_DIR / "JumpingJack" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "JumpingJack" / "jumping_jack.py",
+        "cwd": GAMES_DIR / "JumpingJack",
+        "color": (230, 150, 60),
+        "hover": (210, 130, 45),
+        "image": GAMES_DIR / "JumpingJack" / "assets" / "jumpingjack_icon.png",
     },
 ]
 
