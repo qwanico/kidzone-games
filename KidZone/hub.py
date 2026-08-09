@@ -19,9 +19,16 @@ CARD_W, CARD_H = 280, 260
 CARD_GAP = 40
 COLS = 3
 IMAGE_SIZE = 110
-TOP_Y = 150
 BOTTOM_MARGIN = 40
 SCROLL_SPEED = 60
+
+# Fixed header (title/streak/tabs) stays put; only the card grid below it
+# scrolls, so switching categories always lands on a stable, un-scrolled page.
+GRID_TOP = 210
+TAB_BAR_TOP = 128
+TAB_HEIGHT = 44
+TAB_PAD_X = 26
+TAB_GAP = 14
 
 # ---------------------------------------------------------------------------
 # "Felt-board" design tokens - ported from the approved Kid Zone visual
@@ -60,11 +67,11 @@ SETTINGS_GEAR_RADIUS = 22
 SETTINGS_GEAR_GAP = 14
 
 # ---------------------------------------------------------------------------
-# Category grouping - each game carries a "category" and the home screen is
-# laid out section-by-section (see layout_cards()) rather than one flat grid.
+# Category grouping - each game carries a "category" and the home screen
+# shows one category at a time, switched via the tab bar (see
+# draw_category_tabs()) rather than one long scrolling list of sections.
 # ---------------------------------------------------------------------------
 CATEGORY_ORDER = ["Learn", "Puzzles", "Active"]
-SECTION_HEADER_HEIGHT = 56
 
 GAMES = [
     {
@@ -870,51 +877,60 @@ def draw_settings_screen(surface, progress, mouse_pos, fonts, confirm_reset):
         draw_confirm_overlay(surface, mouse_pos, fonts)
 
 
-def layout_cards():
-    """Lay the grid out section-by-section (Learn / Puzzles / Active) rather
-    than as one flat grid, so the home screen reads as organized categories.
-    Returns (cards, section_headers) where section_headers is a list of
-    (label, color, top_y) for the draw code to render above each group."""
+def layout_cards(active_category):
+    """Lay out just the given category's games in a grid, using local
+    coordinates starting at y=0 (the caller positions the resulting grid
+    surface below the fixed header/tab bar and handles scrolling)."""
+    games_in_category = [g for g in GAMES if g["category"] == active_category]
     cards = []
-    section_headers = []
-    y = TOP_Y
-    for category in CATEGORY_ORDER:
-        games_in_category = [g for g in GAMES if g["category"] == category]
-        if not games_in_category:
-            continue
+    for i, game in enumerate(games_in_category):
+        row, col = divmod(i, COLS)
+        row_start = row * COLS
+        row_count = min(COLS, len(games_in_category) - row_start)
+        row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
+        row_start_x = (WIDTH - row_w) // 2
 
-        section_headers.append((category, CATEGORY_COLORS[category], y))
-        y += SECTION_HEADER_HEIGHT
+        x = row_start_x + col * (CARD_W + CARD_GAP)
+        y = row * (CARD_H + CARD_GAP)
+        cards.append(Card(game, (x, y, CARD_W, CARD_H)))
 
-        for i, game in enumerate(games_in_category):
-            row, col = divmod(i, COLS)
-            row_start = row * COLS
-            row_count = min(COLS, len(games_in_category) - row_start)
-            row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
-            row_start_x = (WIDTH - row_w) // 2
-
-            x = row_start_x + col * (CARD_W + CARD_GAP)
-            card_y = y + row * (CARD_H + CARD_GAP)
-            cards.append(Card(game, (x, card_y, CARD_W, CARD_H)))
-
-        rows = math.ceil(len(games_in_category) / COLS)
-        y += rows * (CARD_H + CARD_GAP)
-
-    return cards, section_headers
+    return cards
 
 
-def draw_section_header(surface, label, color, top_y, font):
-    text_surf = font.render(label, True, color)
-    text_rect = text_surf.get_rect(midtop=(WIDTH // 2, top_y + 6))
-    surface.blit(text_surf, text_rect)
-    underline_rect = pygame.Rect(0, 0, max(70, text_rect.width + 24), 4)
-    underline_rect.midtop = (WIDTH // 2, text_rect.bottom + 6)
-    pygame.draw.rect(surface, color, underline_rect, border_radius=2)
+def category_tab_rects(font):
+    widths = [font.size(cat)[0] + TAB_PAD_X * 2 for cat in CATEGORY_ORDER]
+    total_w = sum(widths) + TAB_GAP * (len(widths) - 1)
+    start_x = (WIDTH - total_w) // 2
+    rects = []
+    x = start_x
+    for w in widths:
+        rects.append(pygame.Rect(x, TAB_BAR_TOP, w, TAB_HEIGHT))
+        x += w + TAB_GAP
+    return rects
+
+
+def draw_category_tabs(surface, active_category, mouse_pos, font):
+    rects = category_tab_rects(font)
+    for cat, rect in zip(CATEGORY_ORDER, rects):
+        color = CATEGORY_COLORS[cat]
+        is_active = cat == active_category
+        hovered = rect.collidepoint(mouse_pos)
+        if is_active:
+            pygame.draw.rect(surface, color, rect, border_radius=rect.height // 2)
+            text_color = PAPER_COLOR
+        else:
+            fill = PAPER_COLOR if hovered else BOARD_2_COLOR
+            pygame.draw.rect(surface, fill, rect, border_radius=rect.height // 2)
+            pygame.draw.rect(surface, color, rect, width=2, border_radius=rect.height // 2)
+            text_color = color
+        text_surf = font.render(cat, True, text_color)
+        surface.blit(text_surf, text_surf.get_rect(center=rect.center))
+    return rects
 
 
 def content_height(cards):
     if not cards:
-        return TOP_Y
+        return 0
     return max(card.rect.bottom for card in cards) + BOTTOM_MARGIN
 
 
@@ -955,22 +971,23 @@ def main():
     name_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 28)
     comment_font = pygame.font.Font(str(FONTS_DIR / "Nunito-Regular.ttf"), 18)
     streak_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 20)
-    section_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 26)
+    tab_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 20)
     fonts = {
         "title": title_font,
         "subtitle": subtitle_font,
         "name": name_font,
         "comment": comment_font,
         "streak": streak_font,
-        "section": section_font,
+        "tab": tab_font,
     }
 
     # ---- Real progress/streak tracking, loaded once at startup ----
     progress = load_progress()
     update_streak(progress)
 
-    cards, section_headers = layout_cards()
-    max_scroll = max(0, content_height(cards) - HEIGHT)
+    active_category = CATEGORY_ORDER[0]
+    cards = layout_cards(active_category)
+    max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP))
     scroll = 0
     running = True
 
@@ -980,7 +997,9 @@ def main():
 
     while running:
         mouse_pos = pygame.mouse.get_pos()
-        mouse_content_pos = (mouse_pos[0], mouse_pos[1] + scroll)
+        # Grid-local mouse position for card hit-testing - the header/tab bar
+        # are fixed on screen now, only the grid below GRID_TOP scrolls.
+        mouse_grid_pos = (mouse_pos[0], mouse_pos[1] - GRID_TOP + scroll)
 
         # Header layout (streak pill + settings gear) computed up front so
         # this frame's click handling matches what actually gets drawn.
@@ -991,6 +1010,7 @@ def main():
         )
         settings_button_rect = pygame.Rect(0, 0, SETTINGS_GEAR_RADIUS * 2, SETTINGS_GEAR_RADIUS * 2)
         settings_button_rect.center = (int(gear_center[0]), int(gear_center[1]))
+        tab_rects = category_tab_rects(tab_font)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -1009,29 +1029,43 @@ def main():
                 scroll = max(0, min(scroll - event.y * SCROLL_SPEED, max_scroll))
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if state == STATE_MENU:
-                    if settings_button_rect.collidepoint(mouse_content_pos):
+                    if settings_button_rect.collidepoint(mouse_pos):
                         gate_challenge = new_gate_challenge()
                         state = STATE_GATE
                     else:
-                        for card in cards:
-                            if card.is_hovered(mouse_content_pos):
-                                # Record the launch + which game before handing
-                                # off to the subprocess, then re-check
-                                # achievements against the updated progress.
-                                progress["total_launches"] += 1
-                                if card.game["name"] not in progress["games_played"]:
-                                    progress["games_played"].append(card.game["name"])
-                                save_progress(progress)
-                                check_achievements(progress)
-
-                                pygame.display.quit()
-                                pygame.mixer.quit()
-                                launch_game(card.game)
-                                pygame.mixer.init()
-                                screen = pygame.display.set_mode((WIDTH, HEIGHT))
-                                pygame.display.set_caption("Kid Zone")
-                                load_images()
+                        clicked_tab = False
+                        for cat, rect in zip(CATEGORY_ORDER, tab_rects):
+                            if rect.collidepoint(mouse_pos):
+                                clicked_tab = True
+                                if cat != active_category:
+                                    active_category = cat
+                                    cards = layout_cards(active_category)
+                                    max_scroll = max(
+                                        0, content_height(cards) - (HEIGHT - GRID_TOP)
+                                    )
+                                    scroll = 0
                                 break
+
+                        if not clicked_tab and mouse_pos[1] >= GRID_TOP:
+                            for card in cards:
+                                if card.is_hovered(mouse_grid_pos):
+                                    # Record the launch + which game before handing
+                                    # off to the subprocess, then re-check
+                                    # achievements against the updated progress.
+                                    progress["total_launches"] += 1
+                                    if card.game["name"] not in progress["games_played"]:
+                                        progress["games_played"].append(card.game["name"])
+                                    save_progress(progress)
+                                    check_achievements(progress)
+
+                                    pygame.display.quit()
+                                    pygame.mixer.quit()
+                                    launch_game(card.game)
+                                    pygame.mixer.init()
+                                    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+                                    pygame.display.set_caption("Kid Zone")
+                                    load_images()
+                                    break
 
                 elif state == STATE_GATE:
                     if GATE_BACK_BUTTON.collidepoint(mouse_pos):
@@ -1071,34 +1105,36 @@ def main():
             clock.tick(60)
             continue
 
-        # ---- STATE_MENU: scrolling grid + header ----
+        # ---- STATE_MENU: fixed header/tabs + scrolling grid below them ----
         ticks = pygame.time.get_ticks()
 
-        content = pygame.Surface((WIDTH, content_height(cards)))
-        content.fill(BG_COLOR)
+        screen.fill(BG_COLOR)
 
         # ---- Header: Sunny + title, subtitle, streak pill, settings gear ----
         title_surf = title_font.render("Kid Zone", True, TITLE_COLOR)
         title_rect = title_surf.get_rect(center=(WIDTH // 2, 62))
         mascot_size = 64
         mascot_center = (title_rect.left - mascot_size * 0.55 - 10, title_rect.centery)
-        draw_sunny(content, mascot_center, mascot_size, ticks)
-        content.blit(title_surf, title_rect)
+        draw_sunny(screen, mascot_center, mascot_size, ticks)
+        screen.blit(title_surf, title_rect)
 
         subtitle_surf = subtitle_font.render(
             "Pick a game to play!", True, SUBTITLE_COLOR
         )
-        content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 104)))
+        screen.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 104)))
 
-        draw_streak_pill(content, WIDTH - 24, 22, streak_font, progress["streak_days"])
-        gear_hovered = settings_button_rect.collidepoint(mouse_content_pos)
-        draw_settings_button(content, gear_center, SETTINGS_GEAR_RADIUS, gear_hovered)
+        draw_streak_pill(screen, WIDTH - 24, 22, streak_font, progress["streak_days"])
+        gear_hovered = settings_button_rect.collidepoint(mouse_pos)
+        draw_settings_button(screen, gear_center, SETTINGS_GEAR_RADIUS, gear_hovered)
 
-        for label, color, top_y in section_headers:
-            draw_section_header(content, label, color, top_y, section_font)
+        draw_category_tabs(screen, active_category, mouse_pos, tab_font)
+
+        # ---- Scrollable card grid, clipped so it never draws over the header ----
+        grid_h = max(content_height(cards), HEIGHT - GRID_TOP)
+        grid_surface = pygame.Surface((WIDTH, grid_h), pygame.SRCALPHA)
 
         for card in cards:
-            hovered = card.is_hovered(mouse_content_pos)
+            hovered = mouse_pos[1] >= GRID_TOP and card.is_hovered(mouse_grid_pos)
             color = card.game["hover"] if hovered else card.game["color"]
 
             if hovered:
@@ -1109,17 +1145,17 @@ def main():
             else:
                 rect = card.rect
 
-            draw_card_shadow(content, rect, CARD_RADIUS, hovered)
-            pygame.draw.rect(content, color, rect, border_radius=CARD_RADIUS)
-            pygame.draw.rect(content, PAPER_COLOR, rect, width=3, border_radius=CARD_RADIUS)
+            draw_card_shadow(grid_surface, rect, CARD_RADIUS, hovered)
+            pygame.draw.rect(grid_surface, color, rect, border_radius=CARD_RADIUS)
+            pygame.draw.rect(grid_surface, PAPER_COLOR, rect, width=3, border_radius=CARD_RADIUS)
 
             image = card.game["image_surface"]
             img_top = rect.top + 18
-            content.blit(image, image.get_rect(midtop=(rect.centerx, img_top)))
+            grid_surface.blit(image, image.get_rect(midtop=(rect.centerx, img_top)))
 
             name_top = img_top + IMAGE_SIZE + 12
             name_surf = name_font.render(card.game["name"], True, (255, 255, 255))
-            content.blit(
+            grid_surface.blit(
                 name_surf, name_surf.get_rect(midtop=(rect.centerx, name_top))
             )
 
@@ -1127,21 +1163,28 @@ def main():
             lines = card.game["comment"].split("\n")
             for i, line in enumerate(lines):
                 line_surf = comment_font.render(line, True, (255, 255, 255))
-                content.blit(
+                grid_surface.blit(
                     line_surf,
                     line_surf.get_rect(
                         midtop=(rect.centerx, comment_top + i * 22)
                     ),
                 )
 
-        screen.fill(BG_COLOR)
-        screen.blit(content, (0, -scroll))
+        prev_clip = screen.get_clip()
+        screen.set_clip(pygame.Rect(0, GRID_TOP, WIDTH, HEIGHT - GRID_TOP))
+        screen.blit(grid_surface, (0, GRID_TOP - scroll))
+        screen.set_clip(prev_clip)
 
         if max_scroll > 0:
             track_x = WIDTH - 14
-            pygame.draw.rect(screen, SCROLLBAR_COLOR, (track_x, 0, 8, HEIGHT), border_radius=4)
-            thumb_h = max(30, HEIGHT * HEIGHT // content_height(cards))
-            thumb_y = int(scroll / max_scroll * (HEIGHT - thumb_h)) if max_scroll else 0
+            track_h = HEIGHT - GRID_TOP
+            pygame.draw.rect(
+                screen, SCROLLBAR_COLOR, (track_x, GRID_TOP, 8, track_h), border_radius=4
+            )
+            thumb_h = max(30, track_h * track_h // grid_h)
+            thumb_y = GRID_TOP + (
+                int(scroll / max_scroll * (track_h - thumb_h)) if max_scroll else 0
+            )
             pygame.draw.rect(
                 screen, SCROLLBAR_THUMB_COLOR, (track_x, thumb_y, 8, thumb_h), border_radius=4
             )
