@@ -341,6 +341,15 @@ async def main():
 
     nav_button = pygame.Rect(24, 20, 190, 42)
 
+    # Touch has no scroll wheel, so a drag on the grid scrolls it; a short
+    # drag (under the threshold) is instead treated as a tap-to-launch.
+    # Same pattern as KidZoneWeb/main.py's menu screen.
+    DRAG_CLICK_THRESHOLD = 12
+    dragging = False
+    drag_start_y = 0
+    drag_scroll_start = 0
+    drag_moved = 0
+
     while running:
         mouse_pos = pygame.mouse.get_pos()
         # Grid-local mouse position for card hit-testing - the header/tab bar
@@ -360,12 +369,12 @@ async def main():
             elif event.type == pygame.MOUSEWHEEL:
                 scroll = max(0, min(scroll - event.y * SCROLL_SPEED, max_scroll))
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if nav_button.collidepoint(mouse_pos):
+                if nav_button.collidepoint(event.pos):
                     go_to_kidzone()
                     continue
                 clicked_tab = False
                 for cat, rect in zip(CATEGORY_ORDER, tab_rects):
-                    if rect.collidepoint(mouse_pos):
+                    if rect.collidepoint(event.pos):
                         clicked_tab = True
                         if cat != active_category:
                             active_category = cat
@@ -379,14 +388,26 @@ async def main():
                             )
                         break
 
-                if not clicked_tab and mouse_pos[1] >= GRID_TOP:
+                if not clicked_tab and event.pos[1] >= GRID_TOP:
+                    dragging = True
+                    drag_start_y = event.pos[1]
+                    drag_scroll_start = scroll
+                    drag_moved = 0
+            elif event.type == pygame.MOUSEMOTION and dragging:
+                dy = event.pos[1] - drag_start_y
+                drag_moved = max(drag_moved, abs(dy))
+                scroll = max(0, min(drag_scroll_start - dy, max_scroll))
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if dragging and drag_moved < DRAG_CLICK_THRESHOLD:
+                    tap_pos = (event.pos[0], event.pos[1] - GRID_TOP + scroll)
                     for card in cards:
-                        if card.is_hovered(mouse_grid_pos):
+                        if card.is_hovered(tap_pos):
                             await launch_game(card.game)
                             screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
                             pygame.display.set_caption("Arcade")
                             load_images()
                             break
+                dragging = False
 
         screen.blit(header_bg, (0, 0))
 
