@@ -1827,6 +1827,14 @@ async def run():
     global STARTING_FRUIT_COUNT, music_volume, voice_volume, effects_volume
     global correct_fruit, shake_fruit, shake_start_time, score, streak, new_best_this_run, active_count
     global timer_remaining
+    global music_channel
+
+    # background_music.play() was already consumed once at module import
+    # time, so re-entering the game needs a fresh play() call here - and
+    # exiting (see the end of this function) must explicitly stop it,
+    # since nothing else does and it loops forever otherwise, overlapping
+    # with whatever plays next.
+    music_channel = background_music.play(loops=-1)
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
     if platform is not None and hasattr(platform, "window"):
@@ -2238,6 +2246,8 @@ async def run():
         pygame.display.update()
 
         await asyncio.sleep(0)
+
+    music_channel.stop()
 
 
 if __name__ == "__main__":
