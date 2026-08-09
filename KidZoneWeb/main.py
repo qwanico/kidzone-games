@@ -8,6 +8,11 @@ from pathlib import Path
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 BASE_DIR = Path(__file__).parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 FONTS_DIR = BASE_DIR / "fonts"
@@ -629,6 +634,34 @@ def draw_lock_icon(surface, center, size, color, hole_color):
     pygame.draw.circle(surface, hole_color, body_rect.center, keyhole_r)
 
 
+def draw_arcade_icon(surface, center, size, color, hole_color):
+    """A tiny game controller - rounded body plus two button dots - used
+    for the link over to the Arcade hub."""
+    body_rect = pygame.Rect(0, 0, size * 0.9, size * 0.5)
+    body_rect.center = center
+    pygame.draw.rect(surface, color, body_rect, border_radius=int(size * 0.22))
+
+    dot_r = max(2, int(size * 0.09))
+    pygame.draw.circle(surface, hole_color, (center[0] + size * 0.2, center[1] - size * 0.06), dot_r)
+    pygame.draw.circle(surface, hole_color, (center[0] + size * 0.32, center[1] + size * 0.06), dot_r)
+
+    stick_w = max(2, int(size * 0.08))
+    cx = center[0] - size * 0.24
+    cy = center[1]
+    pygame.draw.line(surface, hole_color, (cx - size * 0.1, cy), (cx + size * 0.1, cy), stick_w)
+    pygame.draw.line(surface, hole_color, (cx, cy - size * 0.1), (cx, cy + size * 0.1), stick_w)
+
+
+def go_to_arcade():
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.location.href = "/arcade/"
+            return
+        except Exception:
+            pass
+    print("(would navigate to /arcade/ — Arcade)")
+
+
 def draw_icon_button(surface, center, radius, hovered, icon_fn):
     """Small round felt-board icon button (settings gear/lock) drawn in the
     same paper/shadow/hairline style as the streak pill."""
@@ -794,6 +827,10 @@ async def main():
     gear_rect = pygame.Rect(0, 0, gear_radius * 2, gear_radius * 2)
     gear_rect.center = gear_center
 
+    nav_center = (40 + gear_radius, header_y)
+    nav_rect = pygame.Rect(0, 0, gear_radius * 2, gear_radius * 2)
+    nav_rect.center = nav_center
+
     GATE_BTN_W, GATE_BTN_H = 150, 64
     gate_gap = 30
     gate_total_w = GATE_BTN_W * 3 + gate_gap * 2
@@ -857,6 +894,8 @@ async def main():
                             gate_question = make_gate_question()
                             gate_message = ""
                             state = STATE_GATE
+                        elif nav_rect.collidepoint(tap_pos):
+                            go_to_arcade()
                         else:
                             for card in cards:
                                 if card.is_hovered(tap_pos):
@@ -922,6 +961,9 @@ async def main():
 
             gear_hovered = gear_rect.collidepoint(mouse_content_pos)
             draw_icon_button(content, gear_rect.center, gear_radius, gear_hovered, draw_lock_icon)
+
+            nav_hovered = nav_rect.collidepoint(mouse_content_pos)
+            draw_icon_button(content, nav_rect.center, gear_radius, nav_hovered, draw_arcade_icon)
 
             for card in cards:
                 hovered = card.is_hovered(mouse_content_pos)
