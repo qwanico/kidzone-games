@@ -401,6 +401,27 @@ frameborder="1"
 
     <script type="application/javascript">
 
+    // Safari/iOS requires an explicit AudioContext.resume() call made
+    // synchronously inside a real user-gesture event handler, or audio
+    // stays silently suspended forever - no error, it just never plays.
+    // pygbag's own unlock listener (feat_snd() in pythons.js) only gets
+    // registered when config.ume_block is truthy; this project sets
+    // ume_block:0 above to skip the blocking "Tap Anywhere to Play!"
+    // gate, which also skipped that listener as a side effect. Reinstate
+    // it here, independent of ume_block, on every interaction so it's
+    // robust even if the very first click doesn't fully unlock things.
+    function unlock_audio_context() {
+        try {
+            if (typeof Module !== "undefined" && Module.SDL2 && Module.SDL2.audioContext
+                && Module.SDL2.audioContext.state !== "running") {
+                Module.SDL2.audioContext.resume();
+            }
+        } catch (e) {}
+    }
+    window.addEventListener("click", unlock_audio_context, true);
+    window.addEventListener("touchend", unlock_audio_context, true);
+    window.addEventListener("keydown", unlock_audio_context, true);
+
     globalThis.__canvas_resized = (self, ecw, ech) => {
         console.warn("TODO: panda3d canvas monitor", self, ecw, ech)
     }
