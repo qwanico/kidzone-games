@@ -33,6 +33,56 @@ def reset_puck(direction):
     return [WIDTH / 2, HEIGHT / 2], [math.sin(angle) * speed, math.cos(angle) * speed * direction]
 
 
+HOME_RECT = pygame.Rect(20, 20, 60, 50)
+PAUSE_RECT = pygame.Rect(90, 20, 60, 50)
+HUD_BUTTON_BG = (40, 44, 58)
+HUD_BUTTON_BORDER = (110, 116, 136)
+PAUSE_OVERLAY_COLOR = (0, 0, 0, 170)
+PAUSE_BTN_W, PAUSE_BTN_H = 240, 60
+
+
+def draw_hud_button(screen, rect):
+    pygame.draw.rect(screen, HUD_BUTTON_BG, rect, border_radius=10)
+    pygame.draw.rect(screen, HUD_BUTTON_BORDER, rect, width=2, border_radius=10)
+
+
+def draw_home_icon(screen, rect):
+    draw_hud_button(screen, rect)
+    cx, cy = rect.center
+    roof = [(cx - 16, cy - 2), (cx, cy - 15), (cx + 16, cy - 2)]
+    pygame.draw.polygon(screen, (255, 255, 255), roof)
+    body = pygame.Rect(0, 0, 22, 15)
+    body.midtop = (cx, cy - 3)
+    pygame.draw.rect(screen, (255, 255, 255), body)
+
+
+def draw_pause_icon(screen, rect):
+    draw_hud_button(screen, rect)
+    cx, cy = rect.center
+    bar_w, bar_h = 8, 26
+    left_bar = pygame.Rect(0, 0, bar_w, bar_h)
+    left_bar.center = (cx - 7, cy)
+    right_bar = pygame.Rect(0, 0, bar_w, bar_h)
+    right_bar.center = (cx + 7, cy)
+    pygame.draw.rect(screen, (255, 255, 255), left_bar, border_radius=2)
+    pygame.draw.rect(screen, (255, 255, 255), right_bar, border_radius=2)
+
+
+def draw_pause_menu(screen, font_title, font_btn, resume_rect, restart_rect, home_rect):
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill(PAUSE_OVERLAY_COLOR)
+    screen.blit(overlay, (0, 0))
+
+    title_surf = font_title.render("Paused", True, (255, 255, 255))
+    screen.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, resume_rect.top - 60)))
+
+    for rect, label in ((resume_rect, "Resume"), (restart_rect, "Restart"), (home_rect, "Home")):
+        pygame.draw.rect(screen, HUD_BUTTON_BG, rect, border_radius=14)
+        pygame.draw.rect(screen, (255, 255, 255), rect, width=2, border_radius=14)
+        label_surf = font_btn.render(label, True, (255, 255, 255))
+        screen.blit(label_surf, label_surf.get_rect(center=rect.center))
+
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -53,6 +103,11 @@ def main():
     puck_pos, puck_vel, player_pos, ai_pos, player_score, ai_score = new_game()
     winner = None
     running = True
+    paused = False
+
+    resume_rect = pygame.Rect(WIDTH // 2 - PAUSE_BTN_W // 2, HEIGHT // 2 - 20, PAUSE_BTN_W, PAUSE_BTN_H)
+    restart_rect = pygame.Rect(WIDTH // 2 - PAUSE_BTN_W // 2, HEIGHT // 2 + 55, PAUSE_BTN_W, PAUSE_BTN_H)
+    home_menu_rect = pygame.Rect(WIDTH // 2 - PAUSE_BTN_W // 2, HEIGHT // 2 + 130, PAUSE_BTN_W, PAUSE_BTN_H)
 
     while running:
         for event in pygame.event.get():
@@ -61,18 +116,34 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                elif paused:
+                    pass
                 elif winner and event.key in (pygame.K_SPACE, pygame.K_RETURN):
                     puck_pos, puck_vel, player_pos, ai_pos, player_score, ai_score = new_game()
                     winner = None
-            elif event.type == pygame.MOUSEBUTTONDOWN and winner:
-                puck_pos, puck_vel, player_pos, ai_pos, player_score, ai_score = new_game()
-                winner = None
-            elif event.type == pygame.MOUSEMOTION and not winner:
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if HOME_RECT.collidepoint(event.pos):
+                    running = False
+                elif paused:
+                    if resume_rect.collidepoint(event.pos):
+                        paused = False
+                    elif restart_rect.collidepoint(event.pos):
+                        puck_pos, puck_vel, player_pos, ai_pos, player_score, ai_score = new_game()
+                        winner = None
+                        paused = False
+                    elif home_menu_rect.collidepoint(event.pos):
+                        running = False
+                elif PAUSE_RECT.collidepoint(event.pos):
+                    paused = True
+                elif winner:
+                    puck_pos, puck_vel, player_pos, ai_pos, player_score, ai_score = new_game()
+                    winner = None
+            elif event.type == pygame.MOUSEMOTION and not winner and not paused:
                 mx, my = event.pos
                 player_pos[0] = clamp(mx, PADDLE_R, WIDTH - PADDLE_R)
                 player_pos[1] = clamp(my, HEIGHT / 2 + PADDLE_R, HEIGHT - PADDLE_R)
 
-        if not winner:
+        if not winner and not paused:
             if ai_pos[0] < puck_pos[0] - 2:
                 ai_pos[0] += min(AI_SPEED, puck_pos[0] - ai_pos[0])
             elif ai_pos[0] > puck_pos[0] + 2:
@@ -156,6 +227,12 @@ def main():
             screen.blit(
                 again_surf, again_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 30))
             )
+
+        draw_home_icon(screen, HOME_RECT)
+        draw_pause_icon(screen, PAUSE_RECT)
+
+        if paused:
+            draw_pause_menu(screen, title_font, subtitle_font, resume_rect, restart_rect, home_menu_rect)
 
         pygame.display.flip()
         clock.tick(60)

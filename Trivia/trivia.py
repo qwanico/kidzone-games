@@ -152,6 +152,47 @@ class Button:
         return self.rect.collidepoint(pos)
 
 
+HUD_BG = (40, 44, 58)
+HUD_BG_HOVER = (54, 59, 76)
+HUD_BORDER = (110, 116, 140)
+HUD_ICON = (240, 242, 248)
+
+
+def draw_home_icon(surface, rect, mouse_pos):
+    """Small house icon (triangle roof + rectangle body) on a rounded button."""
+    hovered = rect.collidepoint(mouse_pos)
+    pygame.draw.rect(surface, HUD_BG_HOVER if hovered else HUD_BG, rect, border_radius=12)
+    pygame.draw.rect(surface, HUD_BORDER, rect, width=2, border_radius=12)
+
+    cx, cy = rect.center
+    w, h = rect.width, rect.height
+    roof_half = w * 0.28
+    roof_top = (cx, cy - h * 0.26)
+    roof_left = (cx - roof_half, cy - h * 0.02)
+    roof_right = (cx + roof_half, cy - h * 0.02)
+    pygame.draw.polygon(surface, HUD_ICON, [roof_top, roof_left, roof_right])
+
+    body_w, body_h = w * 0.34, h * 0.30
+    body_rect = pygame.Rect(0, 0, body_w, body_h)
+    body_rect.midtop = (cx, cy - h * 0.02)
+    pygame.draw.rect(surface, HUD_ICON, body_rect)
+
+
+def draw_pause_icon(surface, rect, mouse_pos):
+    """Two-bar pause glyph on a rounded button."""
+    hovered = rect.collidepoint(mouse_pos)
+    pygame.draw.rect(surface, HUD_BG_HOVER if hovered else HUD_BG, rect, border_radius=12)
+    pygame.draw.rect(surface, HUD_BORDER, rect, width=2, border_radius=12)
+
+    cx, cy = rect.center
+    bar_w, bar_h = rect.width * 0.14, rect.height * 0.5
+    gap = rect.width * 0.13
+    for dx in (-gap, gap):
+        bar_rect = pygame.Rect(0, 0, bar_w, bar_h)
+        bar_rect.center = (cx + dx, cy)
+        pygame.draw.rect(surface, HUD_ICON, bar_rect, border_radius=2)
+
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -175,9 +216,11 @@ class Game:
         self.font_answer = pygame.font.SysFont("arial", 24)
 
         self.start_button = Button((WIDTH // 2 - 140, 460, 280, 90), "Start")
-        self.pause_button = Button((WIDTH - 90, 20, 60, 46), "II")
+        self.home_button = pygame.Rect(20, 20, 60, 50)
+        self.pause_button = pygame.Rect(90, 20, 60, 50)
         self.resume_button = Button((WIDTH // 2 - 160, 340, 320, 80), "Resume")
-        self.quit_button = Button((WIDTH // 2 - 160, 440, 320, 80), "Quit")
+        self.restart_button = Button((WIDTH // 2 - 160, 440, 320, 80), "Restart")
+        self.quit_button = Button((WIDTH // 2 - 160, 540, 320, 80), "Home")
         self.replay_button = Button((WIDTH // 2 - 160, 520, 320, 80), "Play Again")
 
         self.bg_shapes = [
@@ -197,6 +240,7 @@ class Game:
         self.particles = []
         self.shake_until = 0
         self.shake_seed = 0.0
+        self._pause_started_at = None
 
         self.setup_round()
 
@@ -239,9 +283,21 @@ class Game:
         self.feedback_until = 0
 
     def enter_pause(self):
+        self._pause_started_at = pygame.time.get_ticks()
         self.state = STATE_PAUSED
 
     def resume_game(self):
+        if self._pause_started_at is not None:
+            # Shift any absolute-tick deadlines forward by however long we
+            # were paused, so the per-question feedback timer (and the wrong
+            # -answer shake) can't expire "while paused" and unfairly jump
+            # ahead the instant play resumes.
+            paused_for = pygame.time.get_ticks() - self._pause_started_at
+            if self.feedback_until:
+                self.feedback_until += paused_for
+            if self.shake_until:
+                self.shake_until += paused_for
+            self._pause_started_at = None
         self.state = STATE_PLAYING
 
     def handle_menu_click(self, pos):
@@ -251,6 +307,8 @@ class Game:
     def handle_pause_click(self, pos):
         if self.resume_button.is_hovered(pos):
             self.resume_game()
+        elif self.restart_button.is_hovered(pos):
+            self.start_game()
         elif self.quit_button.is_hovered(pos):
             self.quit_requested = True
 
@@ -259,7 +317,10 @@ class Game:
             self.start_game()
 
     def handle_playing_click(self, pos):
-        if self.pause_button.is_hovered(pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+            return
+        if self.pause_button.collidepoint(pos):
             self.enter_pause()
             return
         if self.answered:
@@ -397,7 +458,8 @@ class Game:
             button.draw(self.screen, self.font_answer, mouse_pos, now=now)
 
         self.draw_particles(now)
-        self.pause_button.draw(self.screen, self.font_icon, mouse_pos, now=now)
+        draw_pause_icon(self.screen, self.pause_button, mouse_pos)
+        draw_home_icon(self.screen, self.home_button, mouse_pos)
 
     def draw_paused(self):
         now = pygame.time.get_ticks()
@@ -408,6 +470,7 @@ class Game:
         paused_surf = self.font_title.render("Paused", True, TITLE_COLOR)
         self.screen.blit(paused_surf, paused_surf.get_rect(center=(WIDTH // 2, 240)))
         self.resume_button.draw(self.screen, self.font_button, mouse_pos, now=now)
+        self.restart_button.draw(self.screen, self.font_button, mouse_pos, now=now)
         self.quit_button.draw(self.screen, self.font_button, mouse_pos, now=now)
 
     def draw_results(self):

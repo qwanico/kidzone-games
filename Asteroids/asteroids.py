@@ -19,6 +19,10 @@ ASTEROID_COLOR = (170, 175, 200)
 BUTTON_COLOR = (60, 66, 96)
 BUTTON_HOVER = (86, 94, 132)
 OVERLAY_COLOR = (14, 15, 24, 190)
+ICON_BG = (40, 44, 58)
+ICON_BG_HOVER = (54, 59, 78)
+ICON_BORDER = (100, 106, 132)
+ICON_COLOR = (255, 255, 255)
 ACCENT_COLOR = (140, 255, 170)
 
 CONFETTI_COLORS = [
@@ -129,6 +133,34 @@ class Button:
         surface.blit(text_surf, text_surf.get_rect(center=draw_rect.center))
 
 
+class IconButton:
+    """Small square icon button for the always-visible Home/Pause HUD controls."""
+
+    def __init__(self, rect, kind):
+        self.rect = pygame.Rect(rect)
+        self.kind = kind  # "home" or "pause"
+
+    def draw(self, surface, mouse_pos):
+        hovered = self.rect.collidepoint(mouse_pos)
+        bg = ICON_BG_HOVER if hovered else ICON_BG
+        pygame.draw.rect(surface, bg, self.rect, border_radius=12)
+        pygame.draw.rect(surface, ICON_BORDER, self.rect, width=2, border_radius=12)
+        cx, cy = self.rect.center
+        if self.kind == "home":
+            roof = [(cx - 15, cy - 1), (cx, cy - 15), (cx + 15, cy - 1)]
+            pygame.draw.polygon(surface, ICON_COLOR, roof)
+            body = pygame.Rect(0, 0, 20, 14)
+            body.midtop = (cx, cy - 3)
+            pygame.draw.rect(surface, ICON_COLOR, body)
+        else:  # pause
+            bar = pygame.Rect(0, 0, 7, 22)
+            bar.center = (cx - 7, cy)
+            pygame.draw.rect(surface, ICON_COLOR, bar, border_radius=2)
+            bar2 = bar.copy()
+            bar2.center = (cx + 7, cy)
+            pygame.draw.rect(surface, ICON_COLOR, bar2, border_radius=2)
+
+
 class Asteroid:
     def __init__(self, x, y, size, vx=None, vy=None):
         self.x, self.y = x, y
@@ -197,9 +229,11 @@ class Game:
 
         self.start_button = Button((WIDTH // 2 - 140, 460, 280, 70), "Start Game")
         self.resume_button = Button((WIDTH // 2 - 160, 340, 320, 70), "Resume")
-        self.quit_button = Button((WIDTH // 2 - 160, 430, 320, 70), "Quit")
+        self.restart_button = Button((WIDTH // 2 - 160, 430, 320, 70), "Restart")
+        self.pause_home_button = Button((WIDTH // 2 - 160, 520, 320, 70), "Home")
         self.menu_button = Button((WIDTH // 2 - 160, 500, 320, 70), "Main Menu")
-        self.pause_button = Button((WIDTH - 90, 20, 60, 44), "II")
+        self.home_button = IconButton((20, 20, 60, 50), "home")
+        self.pause_button = IconButton((90, 20, 60, 50), "pause")
 
         self.stars = [
             (random.uniform(0, WIDTH), random.uniform(0, HEIGHT), random.uniform(0.5, 1.0))
@@ -209,6 +243,8 @@ class Game:
         self.particles = []
         self.state = STATE_MENU
         self.quit_requested = False
+        self.pause_started = None
+        self.pause_accum = 0
         self.reset_game()
 
     # ---------- lifecycle ----------
@@ -226,7 +262,7 @@ class Game:
         self.ship_vx, self.ship_vy = 0.0, 0.0
         self.ship_angle = -90.0
         self.thrusting = False
-        self.invuln_until = pygame.time.get_ticks() + RESPAWN_INVULN_MS
+        self.invuln_until = self.game_now() + RESPAWN_INVULN_MS
 
     def spawn_wave(self):
         self.asteroids = []
@@ -243,11 +279,26 @@ class Game:
         self.reset_game()
         self.state = STATE_PLAYING
 
+    def restart_game(self):
+        self.reset_game()
+        self.pause_started = None
+        self.state = STATE_PLAYING
+
     def enter_pause(self):
         self.state = STATE_PAUSED
+        self.pause_started = pygame.time.get_ticks()
 
     def resume_game(self):
+        if self.pause_started is not None:
+            self.pause_accum += pygame.time.get_ticks() - self.pause_started
+            self.pause_started = None
         self.state = STATE_PLAYING
+
+    def game_now(self):
+        """Game-clock ms, excluding time spent paused (avoids a catch-up jump on resume)."""
+        if self.state == STATE_PAUSED and self.pause_started is not None:
+            return self.pause_started - self.pause_accum
+        return pygame.time.get_ticks() - self.pause_accum
 
     # ---------- input ----------
     def handle_menu_click(self, pos):
@@ -257,7 +308,9 @@ class Game:
     def handle_pause_click(self, pos):
         if self.resume_button.rect.collidepoint(pos):
             self.resume_game()
-        elif self.quit_button.rect.collidepoint(pos):
+        elif self.restart_button.rect.collidepoint(pos):
+            self.restart_game()
+        elif self.pause_home_button.rect.collidepoint(pos):
             self.quit_requested = True
 
     def handle_gameover_click(self, pos):
@@ -265,11 +318,13 @@ class Game:
             self.state = STATE_MENU
 
     def handle_click(self, pos):
-        if self.pause_button.rect.collidepoint(pos):
+        if self.home_button.rect.collidepoint(pos):
+            self.quit_requested = True
+        elif self.pause_button.rect.collidepoint(pos):
             self.enter_pause()
 
     def fire_bullet(self):
-        now = pygame.time.get_ticks()
+        now = self.game_now()
         if now - self.last_shot < FIRE_COOLDOWN_MS:
             return
         self.last_shot = now
@@ -284,7 +339,7 @@ class Game:
 
     # ---------- update ----------
     def update(self):
-        now = pygame.time.get_ticks()
+        now = self.game_now()
         keys = pygame.key.get_pressed()
 
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -433,7 +488,7 @@ class Game:
             pygame.draw.polygon(self.screen, (255, 170, 60), [back_l, flame_tip, back_r])
 
     def draw_playing(self):
-        now = pygame.time.get_ticks()
+        now = self.game_now()
         self.screen.fill(BG_COLOR)
         self.draw_stars(now)
 
@@ -452,7 +507,8 @@ class Game:
         self.screen.blit(hud, (20, 20))
 
         mouse_pos = pygame.mouse.get_pos()
-        self.pause_button.draw(self.screen, self.font_button, mouse_pos, now=now)
+        self.home_button.draw(self.screen, mouse_pos)
+        self.pause_button.draw(self.screen, mouse_pos)
 
     def draw_paused(self):
         now = pygame.time.get_ticks()
@@ -463,7 +519,8 @@ class Game:
         paused_surf = self.font_title.render("Paused", True, TEXT_COLOR)
         self.screen.blit(paused_surf, paused_surf.get_rect(center=(WIDTH // 2, 230)))
         self.resume_button.draw(self.screen, self.font_button, mouse_pos, now=now)
-        self.quit_button.draw(self.screen, self.font_button, mouse_pos, now=now)
+        self.restart_button.draw(self.screen, self.font_button, mouse_pos, now=now)
+        self.pause_home_button.draw(self.screen, self.font_button, mouse_pos, now=now)
 
     def draw_gameover(self):
         now = pygame.time.get_ticks()

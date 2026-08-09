@@ -9,3 +9,6 @@ progress.json
 voice_cache/
 tile_cache/
 .claude/settings.local.json
+.wrangler/
+*-pygbag.ogg
+*-pygbag.png

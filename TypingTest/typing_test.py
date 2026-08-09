@@ -119,6 +119,47 @@ class Button:
         return self.rect.collidepoint(pos)
 
 
+HUD_BG = (40, 44, 58)
+HUD_BG_HOVER = (54, 59, 76)
+HUD_BORDER = (110, 116, 140)
+HUD_ICON = (240, 242, 248)
+
+
+def draw_home_icon(surface, rect, mouse_pos):
+    """Small house icon (triangle roof + rectangle body) on a rounded button."""
+    hovered = rect.collidepoint(mouse_pos)
+    pygame.draw.rect(surface, HUD_BG_HOVER if hovered else HUD_BG, rect, border_radius=12)
+    pygame.draw.rect(surface, HUD_BORDER, rect, width=2, border_radius=12)
+
+    cx, cy = rect.center
+    w, h = rect.width, rect.height
+    roof_half = w * 0.28
+    roof_top = (cx, cy - h * 0.26)
+    roof_left = (cx - roof_half, cy - h * 0.02)
+    roof_right = (cx + roof_half, cy - h * 0.02)
+    pygame.draw.polygon(surface, HUD_ICON, [roof_top, roof_left, roof_right])
+
+    body_w, body_h = w * 0.34, h * 0.30
+    body_rect = pygame.Rect(0, 0, body_w, body_h)
+    body_rect.midtop = (cx, cy - h * 0.02)
+    pygame.draw.rect(surface, HUD_ICON, body_rect)
+
+
+def draw_pause_icon(surface, rect, mouse_pos):
+    """Two-bar pause glyph on a rounded button."""
+    hovered = rect.collidepoint(mouse_pos)
+    pygame.draw.rect(surface, HUD_BG_HOVER if hovered else HUD_BG, rect, border_radius=12)
+    pygame.draw.rect(surface, HUD_BORDER, rect, width=2, border_radius=12)
+
+    cx, cy = rect.center
+    bar_w, bar_h = rect.width * 0.14, rect.height * 0.5
+    gap = rect.width * 0.13
+    for dx in (-gap, gap):
+        bar_rect = pygame.Rect(0, 0, bar_w, bar_h)
+        bar_rect.center = (cx + dx, cy)
+        pygame.draw.rect(surface, HUD_ICON, bar_rect, border_radius=2)
+
+
 def wrap_phrase(phrase, font, max_width):
     words = phrase.split(" ")
     lines = []
@@ -156,9 +197,11 @@ class Game:
         self.font_phrase = pygame.font.SysFont("couriernew,consolas,monospace", 34, bold=True)
 
         self.start_button = Button((WIDTH // 2 - 140, 460, 280, 90), "Start")
-        self.pause_button = Button((WIDTH - 90, 20, 60, 46), "II")
+        self.home_button = pygame.Rect(20, 20, 60, 50)
+        self.pause_button = pygame.Rect(90, 20, 60, 50)
         self.resume_button = Button((WIDTH // 2 - 160, 340, 320, 80), "Resume")
-        self.quit_button = Button((WIDTH // 2 - 160, 440, 320, 80), "Quit")
+        self.restart_button = Button((WIDTH // 2 - 160, 440, 320, 80), "Restart")
+        self.quit_button = Button((WIDTH // 2 - 160, 540, 320, 80), "Home")
         self.replay_button = Button((WIDTH // 2 - 160, 540, 320, 80), "Try Again")
 
         self.bg_shapes = [
@@ -212,6 +255,8 @@ class Game:
     def handle_pause_click(self, pos):
         if self.resume_button.is_hovered(pos):
             self.resume_game()
+        elif self.restart_button.is_hovered(pos):
+            self.start_game()
         elif self.quit_button.is_hovered(pos):
             self.quit_requested = True
 
@@ -220,7 +265,10 @@ class Game:
             self.start_game()
 
     def handle_playing_click(self, pos):
-        if self.pause_button.is_hovered(pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+            return
+        if self.pause_button.collidepoint(pos):
             self.enter_pause()
 
     def type_char(self, ch):
@@ -371,7 +419,8 @@ class Game:
                 cx, cy = cursor_pos
                 pygame.draw.rect(self.screen, CURSOR_COLOR, (cx, cy, 3, self.font_phrase.get_height()))
 
-        self.pause_button.draw(self.screen, self.font_icon, mouse_pos, now=now)
+        draw_pause_icon(self.screen, self.pause_button, mouse_pos)
+        draw_home_icon(self.screen, self.home_button, mouse_pos)
         hint_surf = self.font_subtitle.render("Backspace to fix a mistake", True, SUBTITLE_COLOR)
         self.screen.blit(hint_surf, hint_surf.get_rect(center=(WIDTH // 2, card_rect.bottom + 40)))
 
@@ -384,6 +433,7 @@ class Game:
         paused_surf = self.font_title.render("Paused", True, TITLE_COLOR)
         self.screen.blit(paused_surf, paused_surf.get_rect(center=(WIDTH // 2, 240)))
         self.resume_button.draw(self.screen, self.font_button, mouse_pos, now=now)
+        self.restart_button.draw(self.screen, self.font_button, mouse_pos, now=now)
         self.quit_button.draw(self.screen, self.font_button, mouse_pos, now=now)
 
     def draw_results(self):
