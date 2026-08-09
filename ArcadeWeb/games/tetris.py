@@ -241,7 +241,7 @@ class Game:
         except Exception:
             self.sound_lock = self.sound_clear = self.sound_rotate = self.sound_gameover = None
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
         pygame.display.set_caption("Block Stacker")
 
         self.font_title = pygame.font.SysFont("arial", 56, bold=True)

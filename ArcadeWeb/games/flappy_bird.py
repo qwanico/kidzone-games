@@ -97,7 +97,7 @@ def draw_hud(screen):
 
 async def run():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Flappy Bird")
     clock = pygame.time.Clock()
 

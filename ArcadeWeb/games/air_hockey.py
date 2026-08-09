@@ -86,7 +86,7 @@ def draw_pause_menu(screen, font_title, font_btn, resume_rect, restart_rect, hom
 
 async def run():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Air Hockey")
     clock = pygame.time.Clock()
 

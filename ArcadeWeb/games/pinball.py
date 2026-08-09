@@ -258,7 +258,7 @@ class Game:
         except pygame.error:
             self.wrong_sound = None
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
         pygame.display.set_caption("Pinball")
 
         self.font_title = pygame.font.SysFont("arial", 56, bold=True)

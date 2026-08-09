@@ -276,7 +276,7 @@ class Game:
         except Exception:
             self.sound_drop = self.sound_win = self.sound_draw = None
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
         pygame.display.set_caption("Connect Four")
 
         self.font_title = pygame.font.SysFont("arial", 56, bold=True)

@@ -175,7 +175,7 @@ class Game:
         except Exception:
             self.sound_shoot = self.sound_hit = self.sound_explosion = self.sound_lose_life = None
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
         pygame.display.set_caption("Space Invaders")
 
         self.font_title = pygame.font.SysFont("arial", 60, bold=True)

@@ -187,7 +187,7 @@ class Game:
         except pygame.error:
             self.wrong_sound = None
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
         pygame.display.set_caption("Minesweeper")
 
         self.font_title = pygame.font.SysFont("arial", 68, bold=True)

@@ -150,7 +150,7 @@ class Game:
         except Exception:
             self.sound_hit = self.sound_score = self.sound_wall = None
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
         pygame.display.set_caption("Pong")
 
         self.font_title = pygame.font.SysFont("arial", 68, bold=True)

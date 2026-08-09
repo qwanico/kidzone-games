@@ -220,7 +220,7 @@ class Game:
         except Exception:
             self.sound_shoot = self.sound_explosion_big = self.sound_explosion_small = self.sound_thrust = None
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
         pygame.display.set_caption("Asteroids")
 
         self.font_title = pygame.font.SysFont("arial", 60, bold=True)
