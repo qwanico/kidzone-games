@@ -137,6 +137,9 @@ class Game:
     def __init__(self):
         pygame.init()
         pygame.mixer.init()
+        pygame.mixer.set_reserved(1)
+        self.voice_channel = pygame.mixer.Channel(0)
+        self.voice_cache = {}
 
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
         if platform is not None and hasattr(platform, "window"):
@@ -282,13 +285,13 @@ class Game:
     def enter_pause(self):
         ticks = pygame.time.get_ticks()
         self._pause_remaining = (self.feedback_until - ticks) if self.feedback_until > ticks else None
-        pygame.mixer.music.pause()
+        self.voice_channel.pause()
         self.state = STATE_PAUSED
 
     def resume_game(self):
         ticks = pygame.time.get_ticks()
         self.feedback_until = ticks + self._pause_remaining if self._pause_remaining else 0
-        pygame.mixer.music.unpause()
+        self.voice_channel.unpause()
         self.state = STATE_PLAYING
 
     def load_picture(self, name):
@@ -299,10 +302,11 @@ class Game:
         return pygame.transform.smoothscale(img, new_size)
 
     def speak(self, name):
-        pygame.mixer.music.stop()
-        pygame.mixer.music.load(str(self.items[name]["voice"]))
-        pygame.mixer.music.set_volume(1.0)
-        pygame.mixer.music.play()
+        path = str(self.items[name]["voice"])
+        if path not in self.voice_cache:
+            self.voice_cache[path] = pygame.mixer.Sound(path)
+        self.voice_channel.stop()
+        self.voice_channel.play(self.voice_cache[path])
 
     def new_round(self):
         choices = [n for n in self.names if n != self.last_name] or self.names
