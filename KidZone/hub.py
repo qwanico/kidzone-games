@@ -1,6 +1,9 @@
+import json
 import math
+import random
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import pygame
@@ -9,6 +12,7 @@ BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 FONTS_DIR = BASE_DIR / "fonts"
+PROGRESS_FILE = BASE_DIR / "progress.json"
 
 WIDTH, HEIGHT = 1000, 800
 CARD_W, CARD_H = 280, 260
@@ -50,9 +54,10 @@ SCROLLBAR_THUMB_COLOR = CORAL_COLOR
 
 CARD_RADIUS = 28
 
-# Placeholder streak count for the new header pill. Real day-by-day streak
-# persistence is a separate feature being built later - this is visual only.
-STREAK_DAYS = 7
+# Header layout for the settings gear button, positioned relative to the
+# streak pill's left edge (see streak_pill_rect()).
+SETTINGS_GEAR_RADIUS = 22
+SETTINGS_GEAR_GAP = 14
 
 GAMES = [
     {
@@ -248,6 +253,121 @@ GAMES = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Progress persistence (streaks, launch counts, achievements). Plain JSON
+# file, safe-load-with-defaults - same house style as
+# FruitFinder/fruit_finder.py's load_progress()/save_progress().
+# ---------------------------------------------------------------------------
+
+
+def default_progress():
+    return {
+        "last_played_date": None,
+        "streak_days": 0,
+        "longest_streak": 0,
+        "games_played": [],
+        "total_launches": 0,
+        "achievements_unlocked": [],
+    }
+
+
+def load_progress():
+    default = default_progress()
+    try:
+        with open(PROGRESS_FILE) as f:
+            loaded = json.load(f)
+            default.update(loaded)
+            return default
+    except (FileNotFoundError, ValueError):
+        return default
+
+
+def save_progress(progress):
+    with open(PROGRESS_FILE, "w") as f:
+        json.dump(progress, f)
+
+
+def reset_progress():
+    fresh = default_progress()
+    save_progress(fresh)
+    return fresh
+
+
+def update_streak(progress):
+    """Run once at startup, before the menu loop starts. Compares
+    last_played_date to today and updates streak_days/longest_streak
+    accordingly, then persists the result."""
+    today = date.today().isoformat()
+    last = progress.get("last_played_date")
+
+    if last is None:
+        progress["streak_days"] = 1
+    elif last == today:
+        pass
+    else:
+        gap = None
+        try:
+            gap = (date.today() - date.fromisoformat(last)).days
+        except ValueError:
+            gap = None
+        if gap == 1:
+            progress["streak_days"] += 1
+        else:
+            # Gap of 2+ days (streak broken) or a weird/future date - restart.
+            progress["streak_days"] = 1
+
+    progress["longest_streak"] = max(progress.get("longest_streak", 0), progress["streak_days"])
+    progress["last_played_date"] = today
+    save_progress(progress)
+    return progress
+
+
+# Each achievement gets a short kid-friendly name, a description, a felt-board
+# palette color, and a simple pygame-primitive glyph (see GLYPH_DRAWERS below).
+ACHIEVEMENTS = [
+    {"id": "first_steps", "name": "First Steps", "desc": "Play your first game", "color": SUN_COLOR, "glyph": "star"},
+    {"id": "explorer", "name": "Explorer", "desc": "Try 5 different games", "color": GRASS_COLOR, "glyph": "compass"},
+    {"id": "champion", "name": "Champion", "desc": "Play every game", "color": GRAPE_COLOR, "glyph": "crown"},
+    {"id": "streak_3", "name": "3 Day Streak", "desc": "Play 3 days in a row", "color": CORAL_COLOR, "glyph": "flame"},
+    {"id": "streak_7", "name": "7 Day Streak", "desc": "Play 7 days in a row", "color": CORAL_COLOR, "glyph": "flame"},
+    {"id": "streak_30", "name": "30 Day Streak", "desc": "Play 30 days in a row", "color": CORAL_COLOR, "glyph": "flame"},
+    {"id": "superfan", "name": "Superfan", "desc": "Launch games 50 times", "color": SKY_COLOR, "glyph": "heart"},
+]
+
+
+def _achievement_condition(achievement_id, progress):
+    if achievement_id == "first_steps":
+        return len(progress["games_played"]) >= 1
+    if achievement_id == "explorer":
+        return len(progress["games_played"]) >= 5
+    if achievement_id == "champion":
+        return len(progress["games_played"]) >= len(GAMES)
+    if achievement_id == "streak_3":
+        return progress["streak_days"] >= 3
+    if achievement_id == "streak_7":
+        return progress["streak_days"] >= 7
+    if achievement_id == "streak_30":
+        return progress["streak_days"] >= 30
+    if achievement_id == "superfan":
+        return progress["total_launches"] >= 50
+    return False
+
+
+def check_achievements(progress):
+    """Check every achievement's condition against the current progress and
+    unlock (+ save) any that are newly earned. Returns the list of newly
+    unlocked achievement ids."""
+    newly_unlocked = []
+    for achievement in ACHIEVEMENTS:
+        aid = achievement["id"]
+        if aid not in progress["achievements_unlocked"] and _achievement_condition(aid, progress):
+            progress["achievements_unlocked"].append(aid)
+            newly_unlocked.append(aid)
+    if newly_unlocked:
+        save_progress(progress)
+    return newly_unlocked
+
+
 class Card:
     def __init__(self, game, rect):
         self.game = game
@@ -341,9 +461,10 @@ def draw_card_shadow(surface, rect, radius, hovered):
         surface.blit(shadow_surf, (rect.x - pad + dx, rect.y - pad + dy))
 
 
-def draw_streak_pill(surface, right_x, top_y, font, days):
-    """Draw the coral streak pill (flame icon + day count) used in the
-    header. `right_x` is the pill's right edge x-coordinate."""
+def streak_pill_rect(right_x, top_y, font, days):
+    """Compute the streak pill's rect without drawing anything, so callers
+    can lay out neighboring UI (e.g. the settings gear button) against it
+    before the pill itself is drawn."""
     text_surf = font.render(str(days), True, CORAL_DEEP_COLOR)
     flame_d = font.get_height() * 0.6
     pad_x, pad_y, gap = 14, 8, 8
@@ -351,6 +472,17 @@ def draw_streak_pill(surface, right_x, top_y, font, days):
     pill_h = int(max(flame_d, text_surf.get_height()) + pad_y * 2)
     pill_rect = pygame.Rect(0, 0, pill_w, pill_h)
     pill_rect.topright = (right_x, top_y)
+    return pill_rect
+
+
+def draw_streak_pill(surface, right_x, top_y, font, days):
+    """Draw the coral streak pill (flame icon + day count) used in the
+    header. `right_x` is the pill's right edge x-coordinate."""
+    text_surf = font.render(str(days), True, CORAL_DEEP_COLOR)
+    flame_d = font.get_height() * 0.6
+    pad_x, gap = 14, 8
+    pill_rect = streak_pill_rect(right_x, top_y, font, days)
+    pill_w, pill_h = pill_rect.width, pill_rect.height
 
     shadow_surf = pygame.Surface((pill_w + 16, pill_h + 16), pygame.SRCALPHA)
     pygame.draw.rect(
@@ -384,6 +516,326 @@ def draw_streak_pill(surface, right_x, top_y, font, days):
         text_surf.get_rect(midleft=(flame_cx + flame_d / 2 + gap, pill_rect.centery)),
     )
     return pill_rect
+
+
+# ---------------------------------------------------------------------------
+# Small badge/icon glyphs - all drawn with pygame primitives, no images or
+# emoji, so they match the hand-drawn felt-board style used elsewhere
+# (Sunny, the streak pill's flame teardrop, etc).
+# ---------------------------------------------------------------------------
+
+
+def _star_points(center, outer_r, inner_r, points, rotation=-90):
+    cx, cy = center
+    pts = []
+    for i in range(points * 2):
+        angle = math.radians(rotation + i * 180 / points)
+        r = outer_r if i % 2 == 0 else inner_r
+        pts.append((cx + r * math.cos(angle), cy + r * math.sin(angle)))
+    return pts
+
+
+def glyph_star(surface, center, size, color):
+    pygame.draw.polygon(surface, color, _star_points(center, size * 0.5, size * 0.22, 5))
+
+
+def glyph_compass(surface, center, size, color):
+    pygame.draw.polygon(surface, color, _star_points(center, size * 0.5, size * 0.18, 4))
+    pygame.draw.circle(surface, color, (int(center[0]), int(center[1])), max(2, int(size * 0.08)))
+
+
+def glyph_crown(surface, center, size, color):
+    cx, cy = center
+    half_w = size * 0.42
+    base_y = cy + size * 0.22
+    top_y = cy - size * 0.30
+    base_rect = pygame.Rect(0, 0, int(half_w * 2), int(size * 0.16))
+    base_rect.midtop = (cx, base_y - size * 0.02)
+    pygame.draw.rect(surface, color, base_rect, border_radius=3)
+    peak_w = half_w * 2 / 3
+    peak_positions = (cx - half_w + peak_w / 2, cx, cx + half_w - peak_w / 2)
+    for i, px in enumerate(peak_positions):
+        peak_top = top_y if i == 1 else top_y + size * 0.12
+        pts = [(px - peak_w / 2, base_y), (px, peak_top), (px + peak_w / 2, base_y)]
+        pygame.draw.polygon(surface, color, pts)
+        pygame.draw.circle(surface, color, (int(px), int(peak_top)), max(2, int(size * 0.06)))
+
+
+def glyph_flame(surface, center, size, color):
+    # Same "rounded square rotated 45 degrees" teardrop trick as the header
+    # streak pill's flame icon, just bigger and centered on `center`.
+    d = max(2, int(size * 0.8))
+    flame_surf = pygame.Surface((d, d), pygame.SRCALPHA)
+    pygame.draw.rect(
+        flame_surf,
+        color,
+        (0, 0, d, d),
+        border_top_left_radius=d // 2,
+        border_top_right_radius=d // 2,
+        border_bottom_right_radius=d // 2,
+        border_bottom_left_radius=0,
+    )
+    flame_surf = pygame.transform.rotate(flame_surf, -45)
+    flame_rect = flame_surf.get_rect(center=(int(center[0]), int(center[1])))
+    surface.blit(flame_surf, flame_rect)
+
+
+def glyph_heart(surface, center, size, color):
+    cx, cy = center
+    r = size * 0.22
+    pygame.draw.circle(surface, color, (int(cx - r * 0.9), int(cy - r * 0.4)), int(r))
+    pygame.draw.circle(surface, color, (int(cx + r * 0.9), int(cy - r * 0.4)), int(r))
+    pts = [(cx - r * 1.8, cy - r * 0.1), (cx + r * 1.8, cy - r * 0.1), (cx, cy + r * 1.7)]
+    pygame.draw.polygon(surface, color, pts)
+
+
+GLYPH_DRAWERS = {
+    "star": glyph_star,
+    "compass": glyph_compass,
+    "crown": glyph_crown,
+    "flame": glyph_flame,
+    "heart": glyph_heart,
+}
+
+LOCKED_GLYPH_COLOR = (196, 184, 166)  # muted silhouette, matches board palette
+
+
+def draw_achievement_badge(surface, center, radius, achievement, unlocked):
+    """Circular medallion badge. Unlocked badges use the achievement's full
+    palette color; locked ones render greyed-out/silhouette."""
+    center = (int(center[0]), int(center[1]))
+    if unlocked:
+        ring_color = achievement["color"]
+        fill_color = PAPER_COLOR
+        glyph_color = achievement["color"]
+    else:
+        ring_color = LINE_COLOR
+        fill_color = BOARD_2_COLOR
+        glyph_color = LOCKED_GLYPH_COLOR
+
+    pygame.draw.circle(surface, fill_color, center, radius)
+    pygame.draw.circle(surface, ring_color, center, radius, width=4)
+    drawer = GLYPH_DRAWERS.get(achievement["glyph"], glyph_star)
+    drawer(surface, center, radius * 1.3, glyph_color)
+
+
+def draw_icon_button_bg(surface, center, radius, hovered):
+    """Paper-colored circular button with a soft drop shadow, matching the
+    streak pill's paper/shadow treatment. Returns the button's hit rect."""
+    center = (int(center[0]), int(center[1]))
+    pad = 8
+    shadow_surf = pygame.Surface((radius * 2 + pad * 2, radius * 2 + pad * 2), pygame.SRCALPHA)
+    pygame.draw.circle(shadow_surf, (*SHADOW_COLOR, 45), (radius + pad, radius + pad + 3), radius)
+    surface.blit(shadow_surf, (center[0] - radius - pad, center[1] - radius - pad))
+
+    fill = BOARD_2_COLOR if hovered else PAPER_COLOR
+    pygame.draw.circle(surface, fill, center, radius)
+    pygame.draw.circle(surface, LINE_COLOR, center, radius, width=2)
+
+    rect = pygame.Rect(0, 0, radius * 2, radius * 2)
+    rect.center = center
+    return rect
+
+
+def draw_gear_icon(surface, center, radius, color, hole_color):
+    cx, cy = center
+    teeth = 8
+    outer_r = radius * 0.95
+    inner_r = radius * 0.55
+    tooth_w = radius * 0.34
+    for i in range(teeth):
+        angle = math.radians(i * (360 / teeth))
+        dx, dy = math.cos(angle), math.sin(angle)
+        tip = (cx + dx * outer_r, cy + dy * outer_r)
+        base = (cx + dx * inner_r * 0.85, cy + dy * inner_r * 0.85)
+        perp = (-dy, dx)
+        hw = tooth_w / 2
+        pts = [
+            (base[0] + perp[0] * hw, base[1] + perp[1] * hw),
+            (tip[0] + perp[0] * hw, tip[1] + perp[1] * hw),
+            (tip[0] - perp[0] * hw, tip[1] - perp[1] * hw),
+            (base[0] - perp[0] * hw, base[1] - perp[1] * hw),
+        ]
+        pygame.draw.polygon(surface, color, pts)
+    pygame.draw.circle(surface, color, (int(cx), int(cy)), int(inner_r))
+    pygame.draw.circle(surface, hole_color, (int(cx), int(cy)), max(2, int(inner_r * 0.45)))
+
+
+def draw_settings_button(surface, center, radius, hovered):
+    """Gear-shaped icon button used to open the parental gate. Drawn in the
+    same paper-button style as the header's streak pill."""
+    rect = draw_icon_button_bg(surface, center, radius, hovered)
+    fill_bg = BOARD_2_COLOR if hovered else PAPER_COLOR
+    draw_gear_icon(surface, center, radius * 0.62, INK_SOFT_COLOR, fill_bg)
+    return rect
+
+
+def draw_back_button(surface, rect, font, hovered):
+    color = BOARD_2_COLOR if hovered else PAPER_COLOR
+    pygame.draw.rect(surface, color, rect, border_radius=16)
+    pygame.draw.rect(surface, LINE_COLOR, rect, width=2, border_radius=16)
+    text_surf = font.render("Back", True, INK_COLOR)
+    surface.blit(text_surf, text_surf.get_rect(center=rect.center))
+
+
+# ---------------------------------------------------------------------------
+# Parental gate: a simple arithmetic question a 3-7 year old can't answer,
+# gating access to the settings/reset screen. Low-stakes - a wrong answer
+# just reshuffles the question, no lockout or penalty.
+# ---------------------------------------------------------------------------
+
+GATE_BTN_W, GATE_BTN_H = 170, 90
+GATE_BACK_BUTTON = pygame.Rect(24, HEIGHT - 74, 140, 50)
+
+
+def new_gate_challenge():
+    a = random.randint(4, 15)
+    b = random.randint(4, 15)
+    correct = a + b
+    wrongs = set()
+    while len(wrongs) < 2:
+        delta = random.choice([-4, -3, -2, -1, 1, 2, 3, 4])
+        candidate = correct + delta
+        if candidate > 0 and candidate != correct:
+            wrongs.add(candidate)
+    choices = [correct] + list(wrongs)
+    random.shuffle(choices)
+    return {"a": a, "b": b, "answer": correct, "choices": choices}
+
+
+def gate_choice_rects():
+    gap = 40
+    total_w = GATE_BTN_W * 3 + gap * 2
+    start_x = (WIDTH - total_w) // 2
+    y = 420
+    return [pygame.Rect(start_x + i * (GATE_BTN_W + gap), y, GATE_BTN_W, GATE_BTN_H) for i in range(3)]
+
+
+def draw_gate_screen(surface, challenge, mouse_pos, fonts):
+    surface.fill(BG_COLOR)
+
+    q_surf = fonts["title"].render(
+        f"Grown-ups: what is {challenge['a']} + {challenge['b']}?", True, INK_COLOR
+    )
+    surface.blit(q_surf, q_surf.get_rect(center=(WIDTH // 2, 220)))
+
+    sub_surf = fonts["subtitle"].render(
+        "(This keeps settings just for grown-ups!)", True, SUBTITLE_COLOR
+    )
+    surface.blit(sub_surf, sub_surf.get_rect(center=(WIDTH // 2, 270)))
+
+    rects = gate_choice_rects()
+    for rect, value in zip(rects, challenge["choices"]):
+        hovered = rect.collidepoint(mouse_pos)
+        color = TEAL_COLOR if hovered else PAPER_COLOR
+        text_color = PAPER_COLOR if hovered else INK_COLOR
+        draw_card_shadow(surface, rect, 20, hovered)
+        pygame.draw.rect(surface, color, rect, border_radius=20)
+        pygame.draw.rect(surface, LINE_COLOR, rect, width=3, border_radius=20)
+        val_surf = fonts["name"].render(str(value), True, text_color)
+        surface.blit(val_surf, val_surf.get_rect(center=rect.center))
+
+    back_hovered = GATE_BACK_BUTTON.collidepoint(mouse_pos)
+    draw_back_button(surface, GATE_BACK_BUTTON, fonts["comment"], back_hovered)
+
+    return rects
+
+
+# ---------------------------------------------------------------------------
+# Parent settings screen: streak stats, achievement grid, reset progress
+# (with a confirm step) and a way back to the hub menu.
+# ---------------------------------------------------------------------------
+
+SETTINGS_BACK_BUTTON = pygame.Rect(24, HEIGHT - 74, 140, 50)
+SETTINGS_RESET_BUTTON = pygame.Rect(WIDTH - 24 - 240, HEIGHT - 74, 240, 50)
+CONFIRM_YES_BUTTON = pygame.Rect(WIDTH // 2 - 170, HEIGHT // 2 + 35, 150, 60)
+CONFIRM_NO_BUTTON = pygame.Rect(WIDTH // 2 + 20, HEIGHT // 2 + 35, 150, 60)
+
+ACHIEVEMENT_GRID_COLS = 4
+ACHIEVEMENT_CELL_W, ACHIEVEMENT_CELL_H = 220, 150
+
+
+def achievement_grid_rects():
+    grid_w = ACHIEVEMENT_GRID_COLS * ACHIEVEMENT_CELL_W
+    start_x = (WIDTH - grid_w) // 2
+    start_y = 250
+    rects = []
+    for i in range(len(ACHIEVEMENTS)):
+        row, col = divmod(i, ACHIEVEMENT_GRID_COLS)
+        x = start_x + col * ACHIEVEMENT_CELL_W
+        y = start_y + row * ACHIEVEMENT_CELL_H
+        rects.append(pygame.Rect(x, y, ACHIEVEMENT_CELL_W, ACHIEVEMENT_CELL_H))
+    return rects
+
+
+def draw_confirm_overlay(surface, mouse_pos, fonts):
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((*SHADOW_COLOR, 140))
+    surface.blit(overlay, (0, 0))
+
+    box = pygame.Rect(0, 0, 480, 220)
+    box.center = (WIDTH // 2, HEIGHT // 2)
+    pygame.draw.rect(surface, PAPER_COLOR, box, border_radius=24)
+    pygame.draw.rect(surface, LINE_COLOR, box, width=3, border_radius=24)
+
+    text_surf = fonts["name"].render("Are you sure?", True, INK_COLOR)
+    surface.blit(text_surf, text_surf.get_rect(center=(WIDTH // 2, box.top + 55)))
+    sub_surf = fonts["comment"].render(
+        "This clears all streaks and achievements.", True, INK_SOFT_COLOR
+    )
+    surface.blit(sub_surf, sub_surf.get_rect(center=(WIDTH // 2, box.top + 92)))
+
+    for rect, label, base_color, deep_color in (
+        (CONFIRM_YES_BUTTON, "Yes", CORAL_COLOR, CORAL_DEEP_COLOR),
+        (CONFIRM_NO_BUTTON, "No", TEAL_COLOR, TEAL_DEEP_COLOR),
+    ):
+        hovered = rect.collidepoint(mouse_pos)
+        pygame.draw.rect(surface, deep_color if hovered else base_color, rect, border_radius=14)
+        label_surf = fonts["comment"].render(label, True, PAPER_COLOR)
+        surface.blit(label_surf, label_surf.get_rect(center=rect.center))
+
+
+def draw_settings_screen(surface, progress, mouse_pos, fonts, confirm_reset):
+    surface.fill(BG_COLOR)
+
+    title_surf = fonts["title"].render("Grown-Up Settings", True, TITLE_COLOR)
+    surface.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, 55)))
+
+    streak_days = progress["streak_days"]
+    longest = progress["longest_streak"]
+    streak_line = f"Current streak: {streak_days} day{'s' if streak_days != 1 else ''}"
+    longest_line = f"Longest streak: {longest} day{'s' if longest != 1 else ''}"
+    s1 = fonts["subtitle"].render(streak_line, True, INK_COLOR)
+    s2 = fonts["subtitle"].render(longest_line, True, INK_COLOR)
+    surface.blit(s1, s1.get_rect(center=(WIDTH // 2, 100)))
+    surface.blit(s2, s2.get_rect(center=(WIDTH // 2, 128)))
+
+    ach_title = fonts["subtitle"].render("Achievements", True, SUBTITLE_COLOR)
+    surface.blit(ach_title, ach_title.get_rect(center=(WIDTH // 2, 175)))
+
+    for rect, achievement in zip(achievement_grid_rects(), ACHIEVEMENTS):
+        unlocked = achievement["id"] in progress["achievements_unlocked"]
+        badge_center = (rect.centerx, rect.top + 52)
+        draw_achievement_badge(surface, badge_center, 40, achievement, unlocked)
+        name_color = INK_COLOR if unlocked else INK_SOFT_COLOR
+        name_surf = fonts["comment"].render(achievement["name"], True, name_color)
+        surface.blit(name_surf, name_surf.get_rect(center=(rect.centerx, rect.top + 108)))
+
+    back_hovered = SETTINGS_BACK_BUTTON.collidepoint(mouse_pos)
+    draw_back_button(surface, SETTINGS_BACK_BUTTON, fonts["comment"], back_hovered)
+
+    reset_hovered = SETTINGS_RESET_BUTTON.collidepoint(mouse_pos)
+    pygame.draw.rect(
+        surface,
+        CORAL_DEEP_COLOR if reset_hovered else CORAL_COLOR,
+        SETTINGS_RESET_BUTTON,
+        border_radius=16,
+    )
+    reset_text = fonts["comment"].render("Reset Progress", True, PAPER_COLOR)
+    surface.blit(reset_text, reset_text.get_rect(center=SETTINGS_RESET_BUTTON.center))
+
+    if confirm_reset:
+        draw_confirm_overlay(surface, mouse_pos, fonts)
 
 
 def layout_cards():
@@ -424,6 +876,14 @@ def load_images():
         )
 
 
+# Hub menu state machine. The grid/scroll flow lives in STATE_MENU;
+# STATE_GATE is the parental math-question gate; STATE_SETTINGS is the
+# streak/achievements/reset screen it unlocks.
+STATE_MENU = "menu"
+STATE_GATE = "gate"
+STATE_SETTINGS = "settings"
+
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -436,45 +896,127 @@ def main():
     name_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 28)
     comment_font = pygame.font.Font(str(FONTS_DIR / "Nunito-Regular.ttf"), 18)
     streak_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 20)
+    fonts = {
+        "title": title_font,
+        "subtitle": subtitle_font,
+        "name": name_font,
+        "comment": comment_font,
+        "streak": streak_font,
+    }
+
+    # ---- Real progress/streak tracking, loaded once at startup ----
+    progress = load_progress()
+    update_streak(progress)
 
     cards = layout_cards()
     max_scroll = max(0, content_height(cards) - HEIGHT)
     scroll = 0
     running = True
 
+    state = STATE_MENU
+    gate_challenge = None
+    settings_confirm_reset = False
+
     while running:
         mouse_pos = pygame.mouse.get_pos()
         mouse_content_pos = (mouse_pos[0], mouse_pos[1] + scroll)
+
+        # Header layout (streak pill + settings gear) computed up front so
+        # this frame's click handling matches what actually gets drawn.
+        pill_rect = streak_pill_rect(WIDTH - 24, 22, streak_font, progress["streak_days"])
+        gear_center = (
+            pill_rect.left - SETTINGS_GEAR_GAP - SETTINGS_GEAR_RADIUS,
+            pill_rect.centery,
+        )
+        settings_button_rect = pygame.Rect(0, 0, SETTINGS_GEAR_RADIUS * 2, SETTINGS_GEAR_RADIUS * 2)
+        settings_button_rect.center = (int(gear_center[0]), int(gear_center[1]))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+                if state in (STATE_GATE, STATE_SETTINGS):
+                    state = STATE_MENU
+                    settings_confirm_reset = False
+                else:
+                    running = False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN and state == STATE_MENU:
                 scroll = min(scroll + SCROLL_SPEED, max_scroll)
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP and state == STATE_MENU:
                 scroll = max(scroll - SCROLL_SPEED, 0)
-            elif event.type == pygame.MOUSEWHEEL:
+            elif event.type == pygame.MOUSEWHEEL and state == STATE_MENU:
                 scroll = max(0, min(scroll - event.y * SCROLL_SPEED, max_scroll))
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                for card in cards:
-                    if card.is_hovered(mouse_content_pos):
-                        pygame.display.quit()
-                        pygame.mixer.quit()
-                        launch_game(card.game)
-                        pygame.mixer.init()
-                        screen = pygame.display.set_mode((WIDTH, HEIGHT))
-                        pygame.display.set_caption("Kid Zone")
-                        load_images()
-                        break
+                if state == STATE_MENU:
+                    if settings_button_rect.collidepoint(mouse_content_pos):
+                        gate_challenge = new_gate_challenge()
+                        state = STATE_GATE
+                    else:
+                        for card in cards:
+                            if card.is_hovered(mouse_content_pos):
+                                # Record the launch + which game before handing
+                                # off to the subprocess, then re-check
+                                # achievements against the updated progress.
+                                progress["total_launches"] += 1
+                                if card.game["name"] not in progress["games_played"]:
+                                    progress["games_played"].append(card.game["name"])
+                                save_progress(progress)
+                                check_achievements(progress)
 
+                                pygame.display.quit()
+                                pygame.mixer.quit()
+                                launch_game(card.game)
+                                pygame.mixer.init()
+                                screen = pygame.display.set_mode((WIDTH, HEIGHT))
+                                pygame.display.set_caption("Kid Zone")
+                                load_images()
+                                break
+
+                elif state == STATE_GATE:
+                    if GATE_BACK_BUTTON.collidepoint(mouse_pos):
+                        state = STATE_MENU
+                    else:
+                        for rect, value in zip(gate_choice_rects(), gate_challenge["choices"]):
+                            if rect.collidepoint(mouse_pos):
+                                if value == gate_challenge["answer"]:
+                                    settings_confirm_reset = False
+                                    state = STATE_SETTINGS
+                                else:
+                                    gate_challenge = new_gate_challenge()
+                                break
+
+                elif state == STATE_SETTINGS:
+                    if settings_confirm_reset:
+                        if CONFIRM_YES_BUTTON.collidepoint(mouse_pos):
+                            progress = reset_progress()
+                            settings_confirm_reset = False
+                        elif CONFIRM_NO_BUTTON.collidepoint(mouse_pos):
+                            settings_confirm_reset = False
+                    else:
+                        if SETTINGS_BACK_BUTTON.collidepoint(mouse_pos):
+                            state = STATE_MENU
+                        elif SETTINGS_RESET_BUTTON.collidepoint(mouse_pos):
+                            settings_confirm_reset = True
+
+        if state == STATE_GATE:
+            draw_gate_screen(screen, gate_challenge, mouse_pos, fonts)
+            pygame.display.flip()
+            clock.tick(60)
+            continue
+
+        if state == STATE_SETTINGS:
+            draw_settings_screen(screen, progress, mouse_pos, fonts, settings_confirm_reset)
+            pygame.display.flip()
+            clock.tick(60)
+            continue
+
+        # ---- STATE_MENU: scrolling grid + header ----
         ticks = pygame.time.get_ticks()
 
         content = pygame.Surface((WIDTH, content_height(cards)))
         content.fill(BG_COLOR)
 
-        # ---- Header: Sunny + title, subtitle, streak pill ----
+        # ---- Header: Sunny + title, subtitle, streak pill, settings gear ----
         title_surf = title_font.render("Kid Zone", True, TITLE_COLOR)
         title_rect = title_surf.get_rect(center=(WIDTH // 2, 62))
         mascot_size = 64
@@ -487,7 +1029,9 @@ def main():
         )
         content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 104)))
 
-        draw_streak_pill(content, WIDTH - 24, 22, streak_font, STREAK_DAYS)
+        draw_streak_pill(content, WIDTH - 24, 22, streak_font, progress["streak_days"])
+        gear_hovered = settings_button_rect.collidepoint(mouse_content_pos)
+        draw_settings_button(content, gear_center, SETTINGS_GEAR_RADIUS, gear_hovered)
 
         for card in cards:
             hovered = card.is_hovered(mouse_content_pos)
