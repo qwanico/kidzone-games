@@ -35,7 +35,7 @@ STATE_PAUSED = "paused"
 
 
 def load_shapes():
-    return sorted(p.stem for p in VOICE_DIR.glob("*.ogg"))
+    return sorted(p.stem for p in VOICE_DIR.glob("*.ogg") if not p.stem.endswith("-pygbag"))
 
 
 def article(word):

@@ -31,7 +31,7 @@ STATE_PAUSED = "paused"
 
 
 def load_letters():
-    return sorted(p.stem for p in VOICE_DIR.glob("*.ogg"))
+    return sorted(p.stem for p in VOICE_DIR.glob("*.ogg") if not p.stem.endswith("-pygbag"))
 
 
 class Button:

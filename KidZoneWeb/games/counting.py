@@ -38,7 +38,7 @@ WORD_TO_INT = {word: i + 1 for i, word in enumerate(NUMBER_WORDS)}
 
 
 def load_numbers():
-    stems = {p.stem for p in VOICE_DIR.glob("*.ogg")}
+    stems = {p.stem for p in VOICE_DIR.glob("*.ogg") if not p.stem.endswith("-pygbag")}
     return [w for w in NUMBER_WORDS if w in stems]
 
 

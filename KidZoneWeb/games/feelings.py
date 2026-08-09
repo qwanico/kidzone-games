@@ -37,7 +37,7 @@ def to_display_name(word: str) -> str:
 
 
 def load_feelings():
-    return sorted(p.stem for p in VOICE_DIR.glob("*.ogg"))
+    return sorted(p.stem for p in VOICE_DIR.glob("*.ogg") if not p.stem.endswith("-pygbag"))
 
 
 class Button:

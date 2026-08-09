@@ -46,7 +46,7 @@ COLOR_RGB = {
 
 
 def load_colors():
-    stems = {p.stem for p in VOICE_DIR.glob("*.ogg")}
+    stems = {p.stem for p in VOICE_DIR.glob("*.ogg") if not p.stem.endswith("-pygbag")}
     return [c for c in COLOR_RGB if c in stems]
 
 

@@ -40,7 +40,7 @@ STATE_PAUSED = "paused"
 
 
 def load_problems():
-    stems = {p.stem for p in VOICE_DIR.glob("*.ogg")}
+    stems = {p.stem for p in VOICE_DIR.glob("*.ogg") if not p.stem.endswith("-pygbag")}
     problems = []
     for a in range(1, 6):
         for b in range(1, 6):

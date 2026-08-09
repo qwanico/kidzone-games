@@ -38,6 +38,8 @@ def load_items():
     items = {}
     for img_path in sorted(ASSETS_DIR.glob("*.png")):
         name = img_path.stem
+        if name.endswith("-pygbag"):
+            continue
         voice_path = VOICE_DIR / f"{name}.ogg"
         if voice_path.exists():
             items[name] = {"image": img_path, "voice": voice_path}
