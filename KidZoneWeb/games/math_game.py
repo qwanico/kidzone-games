@@ -28,6 +28,7 @@ SCORE_COLOR = (90, 130, 30)
 OVERLAY_COLOR = (30, 30, 40, 190)
 TITLE_COLOR = (90, 130, 30)
 GLOW_COLOR = (255, 210, 90)
+MILESTONE_GOLD = (215, 150, 20)
 
 CONFETTI_COLORS = [
     (255, 99, 132), (255, 205, 86), (75, 192, 192),
@@ -150,6 +151,26 @@ class Button:
             surface.blit(text_surf, text_rect)
 
 
+def draw_home_icon(surface, rect, color):
+    """Small house icon (triangle roof + rectangle body) on a rounded button."""
+    pygame.draw.rect(surface, color, rect, border_radius=12)
+    pygame.draw.rect(surface, (255, 255, 255), rect, width=2, border_radius=12)
+
+    cx, cy = rect.center
+    w, h = rect.width, rect.height
+
+    roof_half = w * 0.28
+    roof_top = (cx, cy - h * 0.26)
+    roof_left = (cx - roof_half, cy - h * 0.02)
+    roof_right = (cx + roof_half, cy - h * 0.02)
+    pygame.draw.polygon(surface, (255, 255, 255), [roof_top, roof_left, roof_right])
+
+    body_w, body_h = w * 0.34, h * 0.30
+    body_rect = pygame.Rect(0, 0, body_w, body_h)
+    body_rect.midtop = (cx, cy - h * 0.02)
+    pygame.draw.rect(surface, (255, 255, 255), body_rect)
+
+
 def draw_speaker_icon(surface, center, size, color, pulse=0.0):
     x, y = center
     size = size * (1.0 + pulse * 0.08)
@@ -180,7 +201,7 @@ class Game:
         pygame.init()
         pygame.mixer.init()
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
         pygame.display.set_caption("Math")
 
         self.font_word = pygame.font.SysFont("arial", 64, bold=True)
@@ -214,6 +235,7 @@ class Game:
         self.particles = []
         self.shake_until = 0
         self.shake_seed = 0.0
+        self.milestone_text = ""
 
         self.card_rect = pygame.Rect(0, 0, CARD_SIZE, CARD_SIZE)
         self.card_rect.centerx = WIDTH // 2
@@ -221,6 +243,7 @@ class Game:
 
         self.start_button = Button((WIDTH // 2 - 140, 460, 280, 90), "Start")
         self.pause_button = Button((WIDTH - 90, 20, 60, 50), "II")
+        self.home_button = pygame.Rect(20, 20, 60, 50)
         self.resume_button = Button((WIDTH // 2 - 160, 340, 320, 80), "Resume")
         self.quit_button = Button((WIDTH // 2 - 160, 440, 320, 80), "Quit")
 
@@ -295,6 +318,7 @@ class Game:
         self.feedback_text = ""
         self.answered = False
         self.particles = []
+        self.milestone_text = ""
 
         self.speak(self.current_problem)
 
@@ -303,12 +327,18 @@ class Game:
             self.start_game()
 
     def handle_pause_click(self, pos):
-        if self.resume_button.rect.collidepoint(pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+        elif self.resume_button.rect.collidepoint(pos):
             self.resume_game()
         elif self.quit_button.rect.collidepoint(pos):
             self.quit_requested = True
 
     def handle_click(self, pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+            return
+
         if self.pause_button.rect.collidepoint(pos):
             self.enter_pause()
             return
@@ -338,6 +368,10 @@ class Game:
                     self.feedback_color = CORRECT_COLOR
                     self.particles.extend(spawn_confetti(button.rect.center, now))
                     self.particles.extend(spawn_confetti(self.card_rect.center, now))
+                    if self.streak >= 3 and self.streak % 3 == 0:
+                        self.milestone_text = f"{self.streak} in a row!"
+                    else:
+                        self.milestone_text = ""
                 else:
                     self.streak = 0
                     self.wrong_sound.play()
@@ -346,6 +380,7 @@ class Game:
                     self.feedback_color = WRONG_COLOR
                     self.shake_until = now + 400
                     self.shake_seed = random.uniform(0, 100)
+                    self.milestone_text = ""
 
                 self.feedback_until = now + FEEDBACK_MS
                 return
@@ -376,6 +411,14 @@ class Game:
             else:
                 pygame.draw.rect(surf, (*p.color, alpha), surf.get_rect())
             self.screen.blit(surf, (x - p.size, y - p.size))
+
+    def draw_milestone(self, text):
+        banner = self.font_feedback.render(text, True, MILESTONE_GOLD)
+        banner_rect = banner.get_rect(center=(WIDTH // 2, 40))
+        bg_rect = banner_rect.inflate(50, 24)
+        pygame.draw.rect(self.screen, (255, 255, 255), bg_rect, border_radius=18)
+        pygame.draw.rect(self.screen, MILESTONE_GOLD, bg_rect, 4, border_radius=18)
+        self.screen.blit(banner, banner_rect)
 
     def draw_menu(self):
         now = pygame.time.get_ticks()
@@ -468,12 +511,16 @@ class Game:
                 )
 
         self.pause_button.draw(self.screen, self.font_icon, mouse_pos, now=now)
+        draw_home_icon(self.screen, self.home_button, BUTTON_COLOR)
 
         if self.feedback_text and now < self.feedback_until:
             bounce = math.sin(now / 90) * 3
             fb_surf = self.font_feedback.render(self.feedback_text, True, self.feedback_color)
             fb_rect = fb_surf.get_rect(center=(WIDTH // 2, card_rect.bottom + 40 + int(bounce)))
             self.screen.blit(fb_surf, fb_rect)
+
+        if self.milestone_text and now < self.feedback_until:
+            self.draw_milestone(self.milestone_text)
 
     def draw_paused(self):
         now = pygame.time.get_ticks()

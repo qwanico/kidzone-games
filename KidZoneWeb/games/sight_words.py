@@ -1,4 +1,5 @@
 import asyncio
+import math
 import random
 from pathlib import Path
 
@@ -13,6 +14,8 @@ CARD_SIZE = 360
 FEEDBACK_MS = 1600
 
 BG_COLOR = (230, 245, 255)
+BG_TOP_COLOR = (200, 232, 253)
+BG_BOTTOM_COLOR = (235, 248, 255)
 CARD_COLOR = (255, 255, 255)
 CARD_BORDER = (190, 210, 230)
 SPEAKER_COLOR = (90, 160, 230)
@@ -24,6 +27,19 @@ TEXT_COLOR = (50, 50, 60)
 SCORE_COLOR = (60, 90, 130)
 OVERLAY_COLOR = (30, 30, 40, 190)
 TITLE_COLOR = (60, 90, 130)
+MILESTONE_COLOR = (230, 160, 40)
+CLOUD_COLOR = (255, 255, 255)
+
+CONFETTI_COLORS = [
+    (255, 220, 90),
+    (110, 196, 255),
+    (255, 255, 255),
+    (140, 220, 180),
+    (255, 160, 190),
+]
+
+GRAVITY = 480
+MILESTONE_MS = 1300
 
 STATE_MENU = "menu"
 STATE_PLAYING = "playing"
@@ -32,6 +48,43 @@ STATE_PAUSED = "paused"
 
 def load_words():
     return sorted(p.stem for p in VOICE_DIR.glob("*.ogg") if not p.stem.endswith("-pygbag"))
+
+
+def build_gradient(width, height, top_color, bottom_color):
+    surf = pygame.Surface((width, height))
+    for y in range(height):
+        t = y / max(1, height - 1)
+        r = int(top_color[0] + (bottom_color[0] - top_color[0]) * t)
+        g = int(top_color[1] + (bottom_color[1] - top_color[1]) * t)
+        b = int(top_color[2] + (bottom_color[2] - top_color[2]) * t)
+        pygame.draw.line(surf, (r, g, b), (0, y), (width, y))
+    return surf
+
+
+def draw_home_icon(surface, rect, color, hovered=False):
+    bg = tuple(min(255, c + 15) for c in color) if hovered else color
+    pygame.draw.rect(surface, bg, rect, border_radius=12)
+    pygame.draw.rect(surface, (255, 255, 255), rect, width=3, border_radius=12)
+
+    cx, cy = rect.center
+    w, h = rect.width, rect.height
+
+    roof_half = w * 0.30
+    roof_top_y = cy - h * 0.26
+    roof_base_y = cy - h * 0.02
+
+    body_w = w * 0.42
+    body_h = h * 0.32
+    body_rect = pygame.Rect(0, 0, body_w, body_h)
+    body_rect.midtop = (cx, roof_base_y)
+    pygame.draw.rect(surface, (255, 255, 255), body_rect, border_radius=2)
+
+    roof_points = [
+        (cx - roof_half, roof_base_y),
+        (cx, roof_top_y),
+        (cx + roof_half, roof_base_y),
+    ]
+    pygame.draw.polygon(surface, (255, 255, 255), roof_points)
 
 
 class Button:
@@ -87,7 +140,7 @@ class Game:
         pygame.init()
         pygame.mixer.init()
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
         pygame.display.set_caption("Sight Words")
 
         self.font_word = pygame.font.SysFont("arial", 48, bold=True)
@@ -97,6 +150,7 @@ class Game:
         self.font_subtitle = pygame.font.SysFont("arial", 26)
         self.font_icon = pygame.font.SysFont("arial", 24, bold=True)
         self.font_reveal = pygame.font.SysFont("arial", 90, bold=True)
+        self.font_milestone = pygame.font.SysFont("arial", 40, bold=True)
 
         self.words = load_words()
         if len(self.words) < 2:
@@ -121,12 +175,103 @@ class Game:
 
         self.start_button = Button((WIDTH // 2 - 140, 460, 280, 90), "Start")
         self.pause_button = Button((WIDTH - 90, 20, 60, 50), "II")
+        self.home_button = pygame.Rect(20, 20, 60, 50)
         self.resume_button = Button((WIDTH // 2 - 160, 340, 320, 80), "Resume")
         self.quit_button = Button((WIDTH // 2 - 160, 440, 320, 80), "Quit")
 
         self.state = STATE_MENU
         self._pause_remaining = None
         self.quit_requested = False
+
+        # --- decorative background (clear sky with slow drifting clouds) ---
+        self.bg_surface = build_gradient(WIDTH, HEIGHT, BG_TOP_COLOR, BG_BOTTOM_COLOR)
+        self.clouds = [self._make_cloud(initial=True) for _ in range(5)]
+
+        # --- confetti / particle burst on correct answers ---
+        self.particles = []
+
+        # --- streak milestone callout ---
+        self.milestone_text = ""
+        self.milestone_until = 0
+
+    def _make_cloud(self, initial=False):
+        return {
+            "x": random.uniform(0, WIDTH) if initial else -220,
+            "y": random.uniform(30, 230),
+            "speed": random.uniform(10, 24),
+            "scale": random.uniform(0.7, 1.3),
+        }
+
+    def update_background(self, dt_ms):
+        dt = dt_ms / 1000
+        for c in self.clouds:
+            c["x"] += c["speed"] * dt
+            if c["x"] > WIDTH + 200:
+                c["x"] = -220
+                c["y"] = random.uniform(30, 230)
+                c["scale"] = random.uniform(0.7, 1.3)
+
+    def draw_background(self):
+        self.screen.blit(self.bg_surface, (0, 0))
+        for c in self.clouds:
+            x, y, scale = c["x"], c["y"], c["scale"]
+            puffs = [(-40, 6, 26), (0, -8, 34), (38, 4, 28), (68, 8, 20)]
+            for dx, dy, r in puffs:
+                pygame.draw.circle(
+                    self.screen,
+                    CLOUD_COLOR,
+                    (int(x + dx * scale), int(y + dy * scale)),
+                    int(r * scale),
+                )
+
+    def spawn_particles(self, cx, cy, streak):
+        count = 16 + min(streak, 10) * 2
+        for _ in range(count):
+            angle = random.uniform(0, math.tau)
+            speed = random.uniform(110, 300)
+            self.particles.append({
+                "x": cx,
+                "y": cy,
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed - random.uniform(80, 180),
+                "color": random.choice(CONFETTI_COLORS),
+                "size": random.randint(4, 8),
+                "angle": random.uniform(0, 360),
+                "spin": random.uniform(-360, 360),
+                "age": 0.0,
+                "life": random.uniform(0.6, 1.1),
+            })
+
+    def update_particles(self, dt_ms):
+        dt = dt_ms / 1000
+        for p in self.particles:
+            p["age"] += dt
+            p["x"] += p["vx"] * dt
+            p["y"] += p["vy"] * dt
+            p["vy"] += GRAVITY * dt
+            p["angle"] += p["spin"] * dt
+        self.particles = [p for p in self.particles if p["age"] < p["life"]]
+
+    def draw_particles(self):
+        for p in self.particles:
+            t = p["age"] / p["life"]
+            alpha = max(0, int(255 * (1 - t)))
+            size = p["size"] * 2
+            piece = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.rect(piece, (*p["color"], alpha), (0, 0, size, size), border_radius=2)
+            rotated = pygame.transform.rotate(piece, p["angle"])
+            rect = rotated.get_rect(center=(p["x"], p["y"]))
+            self.screen.blit(rotated, rect)
+
+    def draw_milestone(self):
+        if pygame.time.get_ticks() >= self.milestone_until:
+            return
+        banner = self.font_milestone.render(self.milestone_text, True, MILESTONE_COLOR)
+        banner_rect = banner.get_rect(center=(WIDTH // 2, 95))
+        bg_rect = banner_rect.inflate(44, 22)
+        pygame.draw.rect(self.screen, (255, 255, 255), bg_rect, border_radius=18)
+        pygame.draw.rect(self.screen, MILESTONE_COLOR, bg_rect, width=3, border_radius=18)
+        self.screen.blit(banner, banner_rect)
 
     def start_game(self):
         self.state = STATE_PLAYING
@@ -188,12 +333,19 @@ class Game:
             self.start_game()
 
     def handle_pause_click(self, pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+            return
         if self.resume_button.rect.collidepoint(pos):
             self.resume_game()
         elif self.quit_button.rect.collidepoint(pos):
             self.quit_requested = True
 
     def handle_click(self, pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+            return
+
         if self.pause_button.rect.collidepoint(pos):
             self.enter_pause()
             return
@@ -220,6 +372,10 @@ class Game:
                     self.streak += 1
                     self.feedback_text = "Great job!"
                     self.feedback_color = CORRECT_COLOR
+                    self.spawn_particles(button.rect.centerx, button.rect.centery, self.streak)
+                    if self.streak >= 3 and self.streak % 3 == 0:
+                        self.milestone_text = f"{self.streak} in a row!"
+                        self.milestone_until = pygame.time.get_ticks() + MILESTONE_MS
                 else:
                     self.streak = 0
                     self.wrong_sound.play()
@@ -229,12 +385,13 @@ class Game:
                 self.feedback_until = pygame.time.get_ticks() + FEEDBACK_MS
                 return
 
-    def update(self):
+    def update(self, dt=16):
+        self.update_particles(dt)
         if self.feedback_until and pygame.time.get_ticks() >= self.feedback_until:
             self.new_round()
 
     def draw_menu(self):
-        self.screen.fill(BG_COLOR)
+        self.draw_background()
         mouse_pos = pygame.mouse.get_pos()
 
         title_surf = self.font_title.render("Sight Words", True, TITLE_COLOR)
@@ -250,7 +407,7 @@ class Game:
         self.start_button.draw(self.screen, self.font_word, mouse_pos)
 
     def draw_playing(self):
-        self.screen.fill(BG_COLOR)
+        self.draw_background()
         mouse_pos = pygame.mouse.get_pos()
 
         card_rect = self.card_rect
@@ -268,12 +425,17 @@ class Game:
         for button in self.buttons:
             button.draw(self.screen, self.font_word, mouse_pos)
 
+        self.draw_particles()
+
         score_text = self.font_score.render(
             f"Score: {self.score}   Streak: {self.streak}", True, SCORE_COLOR
         )
-        self.screen.blit(score_text, (24, 20))
+        self.screen.blit(score_text, (100, 32))
 
         self.pause_button.draw(self.screen, self.font_icon, mouse_pos)
+        draw_home_icon(self.screen, self.home_button, BUTTON_COLOR, self.home_button.collidepoint(mouse_pos))
+
+        self.draw_milestone()
 
         if self.feedback_text and pygame.time.get_ticks() < self.feedback_until:
             fb_surf = self.font_feedback.render(self.feedback_text, True, self.feedback_color)
@@ -294,6 +456,10 @@ class Game:
         self.resume_button.draw(self.screen, self.font_word, mouse_pos)
         self.quit_button.draw(self.screen, self.font_word, mouse_pos)
 
+        # Redraw the home button on top of the overlay (undimmed) so it stays
+        # a clear, immediate one-tap way out even while paused.
+        draw_home_icon(self.screen, self.home_button, BUTTON_COLOR, self.home_button.collidepoint(mouse_pos))
+
     def draw(self):
         if self.state == STATE_MENU:
             self.draw_menu()
@@ -309,6 +475,7 @@ class Game:
         clock = pygame.time.Clock()
         running = True
         while running:
+            dt = clock.tick(60)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -327,14 +494,14 @@ class Game:
                     elif self.state == STATE_PAUSED:
                         self.handle_pause_click(event.pos)
 
+            self.update_background(dt)
             if self.state == STATE_PLAYING:
-                self.update()
+                self.update(dt)
             self.draw()
 
             if self.quit_requested:
                 running = False
 
-            clock.tick(60)
             await asyncio.sleep(0)
 
 

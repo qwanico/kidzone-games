@@ -1,4 +1,5 @@
 import asyncio
+import math
 import random
 from pathlib import Path
 
@@ -24,6 +25,17 @@ SLOT_COLOR = (60, 65, 100)
 SLOT_SELECTABLE = (120, 130, 200)
 SUN_COLOR = (255, 200, 70)
 SUN_GLOW = (255, 220, 130)
+
+CONFETTI_COLORS = [
+    (255, 255, 255),
+    (255, 210, 90),
+    (140, 210, 255),
+    (150, 255, 190),
+    (200, 160, 255),
+]
+
+GRAVITY = 260
+POP_DURATION = 260
 
 STATE_MENU = "menu"
 STATE_PLAYING = "playing"
@@ -71,6 +83,40 @@ def draw_planet(surface, center, planet, height, max_width=None):
     scaled = pygame.transform.smoothscale(img, (max(1, int(width)), max(1, int(actual_height))))
     surface.blit(scaled, scaled.get_rect(center=center))
 
+
+def ease_out_back(t):
+    c1 = 1.70158
+    c3 = c1 + 1
+    ts = t - 1
+    return 1 + c3 * ts ** 3 + c1 * ts ** 2
+
+
+def draw_home_icon(surface, rect, color, hovered=False):
+    bg = tuple(min(255, c + 15) for c in color) if hovered else color
+    pygame.draw.rect(surface, bg, rect, border_radius=12)
+    pygame.draw.rect(surface, (255, 255, 255), rect, width=3, border_radius=12)
+
+    cx, cy = rect.center
+    w, h = rect.width, rect.height
+
+    roof_half = w * 0.30
+    roof_top_y = cy - h * 0.26
+    roof_base_y = cy - h * 0.02
+
+    body_w = w * 0.42
+    body_h = h * 0.32
+    body_rect = pygame.Rect(0, 0, body_w, body_h)
+    body_rect.midtop = (cx, roof_base_y)
+    pygame.draw.rect(surface, (255, 255, 255), body_rect, border_radius=2)
+
+    roof_points = [
+        (cx - roof_half, roof_base_y),
+        (cx, roof_top_y),
+        (cx + roof_half, roof_base_y),
+    ]
+    pygame.draw.polygon(surface, (255, 255, 255), roof_points)
+
+
 SUN_POS = (60, 210)
 SLOT_Y = 210
 SLOT_LEFT = 190
@@ -95,23 +141,37 @@ def tray_pos(index):
     return x, y
 
 
-def make_starfield():
-    surf = pygame.Surface((WIDTH, HEIGHT))
-    surf.fill(BG_COLOR)
+def build_stars():
     rng = random.Random(7)
+    stars = []
     for _ in range(160):
         x = rng.randint(0, WIDTH)
         y = rng.randint(0, HEIGHT)
         size = rng.choice([1, 1, 1, 2])
         brightness = rng.randint(120, 255)
-        pygame.draw.circle(surf, (brightness, brightness, min(255, brightness + 20)), (x, y), size)
+        stars.append({
+            "x": x,
+            "y": y,
+            "size": size,
+            "brightness": brightness,
+            "phase": rng.uniform(0, math.tau),
+            "speed": rng.uniform(0.6, 1.6),
+        })
+    return stars
+
+
+def build_nebulae():
+    rng = random.Random(11)
+    nebulae = []
     for _ in range(3):
-        x = rng.randint(0, WIDTH)
-        y = rng.randint(0, HEIGHT)
-        glow = pygame.Surface((90, 90), pygame.SRCALPHA)
-        pygame.draw.circle(glow, (120, 90, 200, 35), (45, 45), 45)
-        surf.blit(glow, (x - 45, y - 45))
-    return surf
+        nebulae.append((rng.randint(0, WIDTH), rng.randint(0, HEIGHT)))
+    return nebulae
+
+
+def build_nebula_glow():
+    glow = pygame.Surface((90, 90), pygame.SRCALPHA)
+    pygame.draw.circle(glow, (120, 90, 200, 35), (45, 45), 45)
+    return glow
 
 
 class Button:
@@ -132,7 +192,7 @@ class Game:
         pygame.init()
         pygame.mixer.init()
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
         pygame.display.set_caption("Planets")
 
         self.font_title = pygame.font.SysFont("arial", 64, bold=True)
@@ -142,15 +202,27 @@ class Game:
         self.font_small_label = pygame.font.SysFont("arial", 16, bold=True)
         self.font_score = pygame.font.SysFont("arial", 24, bold=True)
 
-        self.starfield = make_starfield()
+        # --- decorative animated space background ---
+        self.stars = build_stars()
+        self.nebulae = build_nebulae()
+        self.nebula_glow = build_nebula_glow()
+        self.shooting_stars = []
+        self.shooting_timer = random.uniform(3, 7)
+
         load_planet_images()
 
         self.wrong_sound = pygame.mixer.Sound(str(SOUNDS_DIR / "wrong.ogg"))
 
         self.start_button = Button((WIDTH // 2 - 140, 460, 280, 90), "Start")
         self.menu_button = Button((WIDTH - 150, 20, 130, 50), "Menu")
+        self.home_button = pygame.Rect(20, 20, 60, 50)
         self.play_again_button = Button((WIDTH // 2 - 300, 500, 280, 80), "Play Again")
         self.win_menu_button = Button((WIDTH // 2 + 20, 500, 280, 80), "Menu")
+
+        # --- particle burst on correct placements / win celebration ---
+        self.particles = []
+        self.placed_anim = {}
+        self.win_confetti_timer = 0.0
 
         self.state = STATE_MENU
         self.quit_requested = False
@@ -165,6 +237,9 @@ class Game:
         self.feedback_until = 0
         self.feedback_slot = None
         self.feedback_color = None
+        self.particles = []
+        self.placed_anim = {}
+        self.win_confetti_timer = 0.0
 
     def handle_menu_click(self, pos):
         if self.start_button.rect.collidepoint(pos):
@@ -177,6 +252,10 @@ class Game:
             self.quit_requested = True
 
     def handle_playing_click(self, pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+            return
+
         if self.menu_button.rect.collidepoint(pos):
             self.quit_requested = True
             return
@@ -200,8 +279,11 @@ class Game:
                     self.placed[order_index] = self.selected
                     self.tray.remove(self.selected)
                     self.selected = None
+                    self.placed_anim[order_index] = pygame.time.get_ticks()
+                    self.spawn_particles(sx, SLOT_Y, count=22)
                     if len(self.placed) == len(PLANETS):
                         self.state = STATE_WIN
+                        self.spawn_particles(WIDTH // 2, 260, count=70)
                 else:
                     self.feedback_until = pygame.time.get_ticks() + FEEDBACK_MS
                     self.feedback_slot = order_index
@@ -210,8 +292,115 @@ class Game:
                     self.selected = None
                 return
 
+    # ---------------- decorative background ----------------
+
+    def update_background(self, dt_ms):
+        dt = dt_ms / 1000
+        self.shooting_timer -= dt
+        if self.shooting_timer <= 0:
+            self.shooting_timer = random.uniform(4, 9)
+            angle = random.uniform(2.3, 2.9)
+            speed = random.uniform(480, 680)
+            self.shooting_stars.append({
+                "x": random.uniform(WIDTH * 0.2, WIDTH * 0.85),
+                "y": random.uniform(20, 120),
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed,
+                "age": 0.0,
+                "life": 0.5,
+            })
+        for sh in self.shooting_stars:
+            sh["age"] += dt
+            sh["x"] += sh["vx"] * dt
+            sh["y"] += sh["vy"] * dt
+        self.shooting_stars = [sh for sh in self.shooting_stars if sh["age"] < sh["life"]]
+
+    def draw_starfield(self):
+        self.screen.fill(BG_COLOR)
+        for nx, ny in self.nebulae:
+            self.screen.blit(self.nebula_glow, (nx - 45, ny - 45))
+
+        now = pygame.time.get_ticks() / 1000
+        for s in self.stars:
+            twinkle = 0.55 + 0.45 * math.sin(now * s["speed"] + s["phase"])
+            b = max(40, min(255, int(s["brightness"] * twinkle)))
+            pygame.draw.circle(self.screen, (b, b, min(255, b + 20)), (s["x"], s["y"]), s["size"])
+
+        for sh in self.shooting_stars:
+            tail_x = sh["x"] - sh["vx"] * 0.04
+            tail_y = sh["y"] - sh["vy"] * 0.04
+            pygame.draw.line(self.screen, (255, 255, 255), (sh["x"], sh["y"]), (tail_x, tail_y), 2)
+            pygame.draw.circle(self.screen, (255, 255, 255), (int(sh["x"]), int(sh["y"])), 2)
+
+    # ---------------- particles ----------------
+
+    def spawn_particles(self, cx, cy, count=20):
+        for _ in range(count):
+            angle = random.uniform(0, math.tau)
+            speed = random.uniform(90, 260)
+            self.particles.append({
+                "x": cx,
+                "y": cy,
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed - random.uniform(60, 140),
+                "color": random.choice(CONFETTI_COLORS),
+                "size": random.randint(3, 7),
+                "angle": random.uniform(0, 360),
+                "spin": random.uniform(-300, 300),
+                "age": 0.0,
+                "life": random.uniform(0.6, 1.2),
+            })
+
+    def spawn_confetti_rain(self, count=8):
+        for _ in range(count):
+            self.particles.append({
+                "x": random.uniform(0, WIDTH),
+                "y": -20,
+                "vx": random.uniform(-30, 30),
+                "vy": random.uniform(60, 140),
+                "color": random.choice(CONFETTI_COLORS),
+                "size": random.randint(4, 8),
+                "angle": random.uniform(0, 360),
+                "spin": random.uniform(-180, 180),
+                "age": 0.0,
+                "life": random.uniform(2.2, 3.2),
+            })
+
+    def update_particles(self, dt_ms):
+        dt = dt_ms / 1000
+        for p in self.particles:
+            p["age"] += dt
+            p["x"] += p["vx"] * dt
+            p["y"] += p["vy"] * dt
+            p["vy"] += GRAVITY * dt
+            p["angle"] += p["spin"] * dt
+        self.particles = [p for p in self.particles if p["age"] < p["life"]]
+
+    def draw_particles(self):
+        for p in self.particles:
+            t = p["age"] / p["life"]
+            alpha = max(0, int(255 * (1 - t)))
+            size = p["size"] * 2
+            piece = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.rect(piece, (*p["color"], alpha), (0, 0, size, size), border_radius=2)
+            rotated = pygame.transform.rotate(piece, p["angle"])
+            rect = rotated.get_rect(center=(p["x"], p["y"]))
+            self.screen.blit(rotated, rect)
+
+    def placed_scale(self, order_index):
+        start = self.placed_anim.get(order_index)
+        if start is None:
+            return 1.0
+        elapsed = pygame.time.get_ticks() - start
+        if elapsed >= POP_DURATION:
+            return 1.0
+        t = elapsed / POP_DURATION
+        return max(0.05, ease_out_back(t))
+
+    # ---------------- drawing ----------------
+
     def draw_menu(self):
-        self.screen.blit(self.starfield, (0, 0))
+        self.draw_starfield()
         mouse_pos = pygame.mouse.get_pos()
 
         title_surf = self.font_title.render("Planets", True, TITLE_COLOR)
@@ -225,22 +414,24 @@ class Game:
         self.start_button.draw(self.screen, self.font_word, mouse_pos)
 
     def draw_playing(self):
-        self.screen.blit(self.starfield, (0, 0))
+        self.draw_starfield()
         mouse_pos = pygame.mouse.get_pos()
 
         pygame.draw.line(
             self.screen, (40, 45, 80), (SUN_POS[0] + 40, SLOT_Y), (SLOT_XS[-1], SLOT_Y), 3
         )
 
+        pulse = 1 + 0.06 * math.sin(pygame.time.get_ticks() / 400)
         glow = pygame.Surface((140, 140), pygame.SRCALPHA)
-        pygame.draw.circle(glow, (*SUN_GLOW, 70), (70, 70), 70)
+        pygame.draw.circle(glow, (*SUN_GLOW, 70), (70, 70), int(70 * pulse))
         self.screen.blit(glow, (SUN_POS[0] - 70, SUN_POS[1] - 70))
         pygame.draw.circle(self.screen, SUN_COLOR, SUN_POS, 40)
 
         for order_index, sx in enumerate(SLOT_XS, start=1):
             if order_index in self.placed:
                 planet = self.placed[order_index]
-                draw_planet(self.screen, (sx, SLOT_Y), planet, SLOT_DISPLAY_H, SLOT_MAX_W)
+                scale = self.placed_scale(order_index)
+                draw_planet(self.screen, (sx, SLOT_Y), planet, SLOT_DISPLAY_H * scale, SLOT_MAX_W * scale)
                 label = self.font_small_label.render(planet["name"], True, TEXT_COLOR)
                 self.screen.blit(label, label.get_rect(center=(sx, SLOT_Y + 55)))
                 continue
@@ -271,15 +462,19 @@ class Game:
             label = self.font_small_label.render(planet["name"], True, TEXT_COLOR)
             self.screen.blit(label, label.get_rect(center=(tx, ty + height / 2 + 20)))
 
+        self.draw_particles()
+
         score_text = self.font_score.render(
             f"Placed: {len(self.placed)} / {len(PLANETS)}", True, SCORE_COLOR
         )
-        self.screen.blit(score_text, (24, 20))
+        self.screen.blit(score_text, (100, 30))
 
         self.menu_button.draw(self.screen, self.font_label, mouse_pos)
+        draw_home_icon(self.screen, self.home_button, BUTTON_COLOR, self.home_button.collidepoint(mouse_pos))
 
     def draw_win(self):
-        self.screen.blit(self.starfield, (0, 0))
+        self.draw_starfield()
+        self.draw_particles()
         mouse_pos = pygame.mouse.get_pos()
 
         title_surf = self.font_title.render("Great job!", True, CORRECT_COLOR)
@@ -312,6 +507,7 @@ class Game:
         clock = pygame.time.Clock()
         running = True
         while running:
+            dt = clock.tick(60)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -328,12 +524,20 @@ class Game:
                     elif self.state == STATE_WIN:
                         self.handle_win_click(event.pos)
 
+            self.update_background(dt)
+            self.update_particles(dt)
+
+            if self.state == STATE_WIN:
+                self.win_confetti_timer -= dt / 1000
+                if self.win_confetti_timer <= 0:
+                    self.win_confetti_timer = 0.5
+                    self.spawn_confetti_rain()
+
             self.draw()
 
             if self.quit_requested:
                 running = False
 
-            clock.tick(60)
             await asyncio.sleep(0)
 
 

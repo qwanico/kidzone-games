@@ -23,6 +23,112 @@ BUG_COLORS = [
 ]
 SQUASH_FLASH_MS = 200
 
+# ---------------- HOME BUTTON ----------------
+HOME_BUTTON_RECT = pygame.Rect(20, 20, 60, 50)
+HOME_BUTTON_COLOR = (70, 60, 45)
+HOME_BUTTON_BORDER = (245, 245, 235)
+
+
+def draw_home_button(screen):
+    pygame.draw.rect(screen, HOME_BUTTON_COLOR, HOME_BUTTON_RECT, border_radius=10)
+    pygame.draw.rect(screen, HOME_BUTTON_BORDER, HOME_BUTTON_RECT, 2, border_radius=10)
+    cx, cy = HOME_BUTTON_RECT.center
+    roof = [(cx - 16, cy - 1), (cx, cy - 15), (cx + 16, cy - 1)]
+    pygame.draw.polygon(screen, (255, 255, 255), roof)
+    body = pygame.Rect(0, 0, 22, 15)
+    body.midtop = (cx, cy - 2)
+    pygame.draw.rect(screen, (255, 255, 255), body)
+
+
+# ---------------- GARDEN BACKGROUND ----------------
+GRASS_DARK = (195, 215, 165)
+GRASS_LIGHT = (240, 248, 218)
+DIRT_PATCH = (205, 185, 145)
+FLOWER_CENTER = (255, 210, 90)
+
+
+def build_background_surface():
+    surface = pygame.Surface((WIDTH, HEIGHT))
+    surface.fill(BG_COLOR)
+    rng = random.Random(4242)
+
+    for cx, cy in ((160, 470), (420, 560), (700, 500), (250, 260), (650, 220)):
+        pygame.draw.ellipse(surface, DIRT_PATCH, (cx - 50, cy - 24, 100, 48))
+
+    for _ in range(650):
+        bx = rng.randint(0, WIDTH)
+        by = rng.randint(0, HEIGHT)
+        blade_h = rng.randint(6, 14)
+        color = rng.choice((GRASS_DARK, GRASS_LIGHT))
+        pygame.draw.line(
+            surface, color, (bx, by), (bx + rng.randint(-3, 3), by - blade_h), 2
+        )
+
+    flower_spots = [(90, 620), (320, 655), (600, 615), (820, 645), (140, 190), (770, 200)]
+    for x, y in flower_spots:
+        for dx, dy in ((0, 0), (-9, 4), (9, 4), (0, -8)):
+            pygame.draw.circle(surface, (255, 255, 255), (x + dx, y + dy), 6)
+        pygame.draw.circle(surface, FLOWER_CENTER, (x, y + 1), 4)
+
+    return surface
+
+
+BACKGROUND_SURFACE = build_background_surface()
+
+
+# ---------------- SQUASH PARTICLES ----------------
+PARTICLE_COLORS = [(120, 200, 90), (90, 160, 70), (210, 225, 130), (150, 180, 60)]
+
+
+def spawn_squash_burst(particles, x, y):
+    for _ in range(16):
+        angle = random.uniform(0, math.tau)
+        speed = random.uniform(1.5, 5.0)
+        particles.append(
+            {
+                "x": x,
+                "y": y,
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed - 1.5,
+                "color": random.choice(PARTICLE_COLORS),
+                "size": random.randint(3, 6),
+                "life": random.uniform(400, 700),
+                "age": 0.0,
+            }
+        )
+
+
+def update_particles(particles, dt_ms):
+    for p in particles:
+        p["age"] += dt_ms
+        p["x"] += p["vx"]
+        p["y"] += p["vy"]
+        p["vy"] += 0.15
+    particles[:] = [p for p in particles if p["age"] < p["life"]]
+
+
+def draw_particles(screen, particles):
+    for p in particles:
+        t = p["age"] / p["life"]
+        alpha = max(0, int(255 * (1 - t)))
+        size = p["size"]
+        surf = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (*p["color"], alpha), (size, size), size)
+        screen.blit(surf, (p["x"] - size, p["y"] - size))
+
+
+def draw_milestone(screen, font, text, alpha):
+    surf = font.render(text, True, (255, 255, 255))
+    rect = surf.get_rect(center=(WIDTH // 2, 185))
+    bg = rect.inflate(44, 24)
+    panel = pygame.Surface(bg.size, pygame.SRCALPHA)
+    a = max(0, min(255, alpha))
+    pygame.draw.rect(panel, (70, 140, 70, min(230, a)), panel.get_rect(), border_radius=16)
+    pygame.draw.rect(panel, (255, 255, 255, a), panel.get_rect(), 3, border_radius=16)
+    screen.blit(panel, bg.topleft)
+    surf.set_alpha(a)
+    screen.blit(surf, rect)
+
 
 class Bug:
     def __init__(self):
@@ -127,7 +233,7 @@ class Bug:
 
 async def run():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
     pygame.display.set_caption("Bug Squasher")
     clock = pygame.time.Clock()
 
@@ -135,6 +241,7 @@ async def run():
     subtitle_font = pygame.font.SysFont(None, 30)
     hud_font = pygame.font.SysFont(None, 40, bold=True)
     big_font = pygame.font.SysFont(None, 72, bold=True)
+    milestone_font = pygame.font.SysFont(None, 46, bold=True)
 
     def new_game():
         return [], 0, pygame.time.get_ticks() + ROUND_SECONDS * 1000, pygame.time.get_ticks()
@@ -142,6 +249,13 @@ async def run():
     bugs, score, end_time, next_spawn_at = new_game()
     game_over = False
     running = True
+
+    particles = []
+    streak = 0
+    best_score = 0
+    new_best = False
+    milestone_text = None
+    milestone_until = 0
 
     while running:
         now = pygame.time.get_ticks()
@@ -155,17 +269,34 @@ async def run():
                 elif game_over and event.key in (pygame.K_SPACE, pygame.K_RETURN):
                     bugs, score, end_time, next_spawn_at = new_game()
                     game_over = False
+                    particles = []
+                    streak = 0
+                    new_best = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if game_over:
+                if HOME_BUTTON_RECT.collidepoint(event.pos):
+                    running = False
+                elif game_over:
                     bugs, score, end_time, next_spawn_at = new_game()
                     game_over = False
+                    particles = []
+                    streak = 0
+                    new_best = False
                 else:
+                    hit = False
                     for bug in bugs:
                         if not bug.squashed and bug.contains(event.pos):
                             bug.squashed = True
                             bug.squash_at = now
                             score += 1
+                            streak += 1
+                            spawn_squash_burst(particles, bug.x, bug.y)
+                            if streak >= 3 and streak % 5 == 0:
+                                milestone_text = f"{streak} squash streak!"
+                                milestone_until = now + 1400
+                            hit = True
                             break
+                    if not hit:
+                        streak = 0
 
         if not game_over:
             if now >= next_spawn_at:
@@ -182,10 +313,15 @@ async def run():
                 and (not b.squashed or now - b.squash_at < SQUASH_FLASH_MS)
             ]
 
+            update_particles(particles, clock.get_time())
+
             if now >= end_time:
                 game_over = True
+                if score > best_score:
+                    best_score = score
+                    new_best = True
 
-        screen.fill(BG_COLOR)
+        screen.blit(BACKGROUND_SURFACE, (0, 0))
 
         title_surf = title_font.render("Bug Squasher", True, TITLE_COLOR)
         screen.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, 60)))
@@ -197,6 +333,8 @@ async def run():
         for bug in bugs:
             bug.draw(screen, now)
 
+        draw_particles(screen, particles)
+
         score_surf = hud_font.render(f"Score: {score}", True, TEXT_COLOR)
         screen.blit(score_surf, (30, 140))
 
@@ -204,17 +342,42 @@ async def run():
         timer_surf = hud_font.render(f"Time: {seconds_left}", True, TEXT_COLOR)
         screen.blit(timer_surf, timer_surf.get_rect(topright=(WIDTH - 30, 140)))
 
+        if milestone_text and now < milestone_until:
+            remaining = milestone_until - now
+            alpha = 255 if remaining > 300 else int(255 * remaining / 300)
+            draw_milestone(screen, milestone_font, milestone_text, alpha)
+        elif now >= milestone_until:
+            milestone_text = None
+
+        draw_home_button(screen)
+
         if game_over:
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 140))
             screen.blit(overlay, (0, 0))
-            done_surf = big_font.render(f"Final Score: {score}", True, (255, 255, 255))
-            screen.blit(done_surf, done_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 20)))
+
+            panel = pygame.Rect(0, 0, 460, 260)
+            panel.center = (WIDTH // 2, HEIGHT // 2)
+            panel_surf = pygame.Surface(panel.size, pygame.SRCALPHA)
+            pygame.draw.rect(panel_surf, (250, 250, 240, 235), panel_surf.get_rect(), border_radius=24)
+            pygame.draw.rect(panel_surf, (90, 140, 70, 255), panel_surf.get_rect(), 5, border_radius=24)
+            screen.blit(panel_surf, panel.topleft)
+
+            done_surf = big_font.render(f"Score: {score}", True, (60, 60, 90))
+            screen.blit(done_surf, done_surf.get_rect(center=(panel.centerx, panel.top + 70)))
+
+            best_surf = hud_font.render(f"Best: {best_score}", True, (70, 90, 60))
+            screen.blit(best_surf, best_surf.get_rect(center=(panel.centerx, panel.top + 125)))
+
+            if new_best:
+                nb_surf = subtitle_font.render("New Best!", True, (200, 130, 20))
+                screen.blit(nb_surf, nb_surf.get_rect(center=(panel.centerx, panel.top + 160)))
+
             again_surf = subtitle_font.render(
-                "Click or press Enter to play again", True, (230, 230, 230)
+                "Click or press Enter to play again", True, (70, 70, 80)
             )
             screen.blit(
-                again_surf, again_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 40))
+                again_surf, again_surf.get_rect(center=(panel.centerx, panel.bottom - 30))
             )
 
         pygame.display.flip()

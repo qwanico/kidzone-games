@@ -266,7 +266,7 @@ async def launch_game(game):
 
 async def main():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
     pygame.display.set_caption("Kid Zone")
     clock = pygame.time.Clock()
     load_images()
@@ -280,6 +280,12 @@ async def main():
     max_scroll = max(0, content_height(cards) - HEIGHT)
     scroll = 0
     running = True
+
+    DRAG_CLICK_THRESHOLD = 12
+    dragging = False
+    drag_start_y = 0
+    drag_scroll_start = 0
+    drag_moved = 0
 
     while running:
         mouse_pos = pygame.mouse.get_pos()
@@ -295,13 +301,25 @@ async def main():
             elif event.type == pygame.MOUSEWHEEL:
                 scroll = max(0, min(scroll - event.y * SCROLL_SPEED, max_scroll))
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                for card in cards:
-                    if card.is_hovered(mouse_content_pos):
-                        await launch_game(card.game)
-                        screen = pygame.display.set_mode((WIDTH, HEIGHT))
-                        pygame.display.set_caption("Kid Zone")
-                        load_images()
-                        break
+                dragging = True
+                drag_start_y = event.pos[1]
+                drag_scroll_start = scroll
+                drag_moved = 0
+            elif event.type == pygame.MOUSEMOTION and dragging:
+                dy = event.pos[1] - drag_start_y
+                drag_moved = max(drag_moved, abs(dy))
+                scroll = max(0, min(drag_scroll_start - dy, max_scroll))
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if dragging and drag_moved < DRAG_CLICK_THRESHOLD:
+                    tap_pos = (event.pos[0], event.pos[1] + scroll)
+                    for card in cards:
+                        if card.is_hovered(tap_pos):
+                            await launch_game(card.game)
+                            screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+                            pygame.display.set_caption("Kid Zone")
+                            load_images()
+                            break
+                dragging = False
 
         content = pygame.Surface((WIDTH, content_height(cards)))
         content.fill(BG_COLOR)

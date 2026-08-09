@@ -25,7 +25,7 @@ HEIGHT = 980
 # the shared Kid Zone hub reclaims the display for its own menu between
 # games. `screen` just needs a placeholder value at import time so the
 # module-level drawing helpers below have something to reference.
-screen = pygame.display.get_surface() or pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.get_surface()
 
 
 # ---------------- COLORS ----------------
@@ -1413,6 +1413,53 @@ def draw_mute_button():
 
 
 
+# ---------------- HOME BUTTON ----------------
+
+home_button = pygame.Rect(
+    20,
+    20,
+    60,
+    50
+)
+
+
+def draw_home_button():
+
+    pygame.draw.rect(
+        screen,
+        (70, 130, 220),
+        home_button,
+        border_radius=10
+    )
+
+    pygame.draw.rect(
+        screen,
+        BLACK,
+        home_button,
+        2,
+        border_radius=10
+    )
+
+    cx, cy = home_button.center
+
+    pygame.draw.polygon(
+        screen,
+        WHITE,
+        [
+            (cx - 12, cy),
+            (cx, cy - 12),
+            (cx + 12, cy),
+        ]
+    )
+
+    pygame.draw.rect(
+        screen,
+        WHITE,
+        (cx - 8, cy, 16, 12)
+    )
+
+
+
 # ---------------- PAUSE BUTTON (during play) ----------------
 
 pause_button = pygame.Rect(
@@ -1729,7 +1776,7 @@ async def run():
     global correct_fruit, shake_fruit, score, streak, new_best_this_run, active_count
     global timer_remaining
 
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
     pygame.display.set_caption("Find The Food")
     pygame.display.set_icon(pygame.image.load(str(BASE_DIR / "assets" / "app_icon.png")))
 
@@ -1938,7 +1985,17 @@ async def run():
 
                 elif game_state == "paused":
 
-                    if resume_button.collidepoint(
+                    if home_button.collidepoint(
+                        mouse_x,
+                        mouse_y
+                    ):
+
+                        running = False
+
+                        continue
+
+
+                    elif resume_button.collidepoint(
                         mouse_x,
                         mouse_y
                     ):
@@ -1956,7 +2013,17 @@ async def run():
 
                 elif game_state == "playing":
 
-                    if pause_button.collidepoint(
+                    if home_button.collidepoint(
+                        mouse_x,
+                        mouse_y
+                    ):
+
+                        running = False
+
+                        continue
+
+
+                    elif pause_button.collidepoint(
                         mouse_x,
                         mouse_y
                     ):
@@ -2068,6 +2135,8 @@ async def run():
 
             draw_pause_overlay()
 
+            draw_home_button()
+
         elif game_state == "game_over":
 
             draw_game_over()
@@ -2100,6 +2169,8 @@ async def run():
             draw_particles()
 
             draw_pause_button()
+
+            draw_home_button()
 
 
         draw_mute_button()

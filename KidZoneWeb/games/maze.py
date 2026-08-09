@@ -28,6 +28,7 @@ BUTTON_COLOR = (110, 120, 135)
 BUTTON_HOVER = (90, 100, 115)
 CORRECT_COLOR = (90, 200, 110)
 OVERLAY_COLOR = (30, 30, 40, 190)
+MILESTONE_GOLD = (215, 150, 20)
 
 CONFETTI_COLORS = [
     (255, 99, 132), (255, 205, 86), (75, 192, 192),
@@ -156,6 +157,26 @@ class Button:
         surface.blit(text_surf, text_rect)
 
 
+def draw_home_icon(surface, rect, color):
+    """Small house icon (triangle roof + rectangle body) on a rounded button."""
+    pygame.draw.rect(surface, color, rect, border_radius=12)
+    pygame.draw.rect(surface, (255, 255, 255), rect, width=2, border_radius=12)
+
+    cx, cy = rect.center
+    w, h = rect.width, rect.height
+
+    roof_half = w * 0.28
+    roof_top = (cx, cy - h * 0.26)
+    roof_left = (cx - roof_half, cy - h * 0.02)
+    roof_right = (cx + roof_half, cy - h * 0.02)
+    pygame.draw.polygon(surface, (255, 255, 255), [roof_top, roof_left, roof_right])
+
+    body_w, body_h = w * 0.34, h * 0.30
+    body_rect = pygame.Rect(0, 0, body_w, body_h)
+    body_rect.midtop = (cx, cy - h * 0.02)
+    pygame.draw.rect(surface, (255, 255, 255), body_rect)
+
+
 def parse_maze(rows):
     grid = [list(row) for row in rows]
     start = goal = None
@@ -174,7 +195,7 @@ class Game:
         pygame.init()
         pygame.mixer.init()
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
         pygame.display.set_caption("Maze")
 
         self.font_title = pygame.font.SysFont("arial", 68, bold=True)
@@ -203,9 +224,11 @@ class Game:
         self.feedback_text = ""
         self.particles = []
         self.won = False
+        self.milestone_text = ""
 
         self.start_button = Button((WIDTH // 2 - 140, HEIGHT // 2 + 40, 280, 90), "Start")
         self.pause_button = Button((WIDTH - 90, 20, 60, 50), "II")
+        self.home_button = pygame.Rect(20, 20, 60, 50)
         self.resume_button = Button((WIDTH // 2 - 160, HEIGHT // 2 - 40, 320, 80), "Resume")
         self.quit_button = Button((WIDTH // 2 - 160, HEIGHT // 2 + 60, 320, 80), "Quit")
 
@@ -243,6 +266,7 @@ class Game:
         self.won = False
         self.feedback_until = 0
         self.particles = []
+        self.milestone_text = ""
 
     def start_game(self):
         self.level_index = 0
@@ -287,6 +311,11 @@ class Game:
             gx, gy = self.cell_to_px(nx + 0.5, ny + 0.5)
             self.particles.extend(spawn_confetti((gx, gy), now))
             self.particles.extend(spawn_confetti((WIDTH // 2, HEIGHT // 2), now))
+            if self.mazes_solved % 3 == 0:
+                self.milestone_text = f"{self.mazes_solved} mazes solved!"
+                self.particles.extend(spawn_confetti((WIDTH // 2, HEIGHT // 2), now, count=30))
+            else:
+                self.milestone_text = ""
 
     def advance_level(self):
         self.level_index += 1
@@ -298,13 +327,17 @@ class Game:
             self.start_game()
 
     def handle_pause_click(self, pos):
-        if self.resume_button.rect.collidepoint(pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+        elif self.resume_button.rect.collidepoint(pos):
             self.resume_game()
         elif self.quit_button.rect.collidepoint(pos):
             self.quit_requested = True
 
     def handle_playing_click(self, pos):
-        if self.pause_button.rect.collidepoint(pos):
+        if self.home_button.collidepoint(pos):
+            self.quit_requested = True
+        elif self.pause_button.rect.collidepoint(pos):
             self.enter_pause()
 
     def handle_key(self, key):
@@ -345,6 +378,14 @@ class Game:
             else:
                 pygame.draw.rect(surf, (*p.color, alpha), surf.get_rect())
             self.screen.blit(surf, (x - p.size, y - p.size))
+
+    def draw_milestone(self, text):
+        banner = self.font_feedback.render(text, True, MILESTONE_GOLD)
+        banner_rect = banner.get_rect(center=(WIDTH // 2, PLAY_TOP - 70))
+        bg_rect = banner_rect.inflate(50, 24)
+        pygame.draw.rect(self.screen, (255, 255, 255), bg_rect, border_radius=18)
+        pygame.draw.rect(self.screen, MILESTONE_GOLD, bg_rect, 4, border_radius=18)
+        self.screen.blit(banner, banner_rect)
 
     def draw_menu(self):
         now = pygame.time.get_ticks()
@@ -451,12 +492,16 @@ class Game:
         self.screen.blit(score_text, (24, 20))
 
         self.pause_button.draw(self.screen, self.font_icon, mouse_pos, now=now)
+        draw_home_icon(self.screen, self.home_button, BUTTON_COLOR)
 
         if self.won and now < self.feedback_until:
             bounce = math.sin(now / 90) * 3
             fb_surf = self.font_feedback.render(self.feedback_text, True, CORRECT_COLOR)
             fb_rect = fb_surf.get_rect(center=(WIDTH // 2, PLAY_TOP - 30 + int(bounce)))
             self.screen.blit(fb_surf, fb_rect)
+
+            if self.milestone_text:
+                self.draw_milestone(self.milestone_text)
 
     def draw_paused(self):
         now = pygame.time.get_ticks()
