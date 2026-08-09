@@ -1,3 +1,4 @@
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -7,6 +8,7 @@ import pygame
 BASE_DIR = Path(__file__).parent
 GAMES_DIR = BASE_DIR.parent
 ICONS_DIR = BASE_DIR / "tile_icons"
+FONTS_DIR = BASE_DIR / "fonts"
 
 WIDTH, HEIGHT = 1000, 800
 CARD_W, CARD_H = 280, 260
@@ -16,13 +18,41 @@ IMAGE_SIZE = 110
 TOP_Y = 150
 BOTTOM_MARGIN = 40
 SCROLL_SPEED = 60
-SCROLLBAR_COLOR = (210, 210, 220)
-SCROLLBAR_THUMB_COLOR = (160, 160, 180)
 
-BG_COLOR = (245, 245, 250)
-TEXT_COLOR = (50, 50, 60)
-TITLE_COLOR = (60, 60, 90)
-SUBTITLE_COLOR = (110, 110, 130)
+# ---------------------------------------------------------------------------
+# "Felt-board" design tokens - ported from the approved Kid Zone visual
+# redesign concept (warm cream background, chunky rounded cards, Sunny the
+# mascot). Colors match the mockup's CSS custom properties 1:1.
+# ---------------------------------------------------------------------------
+BOARD_COLOR = (247, 236, 216)        # #F7ECD8 - warm cream background
+BOARD_2_COLOR = (241, 226, 198)      # #F1E2C6 - secondary panel cream
+INK_COLOR = (52, 40, 31)             # #34281F - warm dark brown text
+INK_SOFT_COLOR = (107, 90, 72)       # #6B5A48 - softer secondary text
+PAPER_COLOR = (255, 251, 242)        # #FFFBF2 - card/paper surface
+LINE_COLOR = (230, 214, 179)         # #E6D6B3 - hairline / divider
+TEAL_COLOR = (15, 141, 131)          # #0F8D83 - brand teal
+TEAL_DEEP_COLOR = (10, 107, 99)      # #0A6B63
+CORAL_COLOR = (255, 107, 82)         # #FF6B52 - energy / streak
+CORAL_DEEP_COLOR = (225, 80, 58)     # #E1503A
+SUN_COLOR = (255, 194, 60)           # #FFC23C - Sunny the mascot / rewards
+SUN_DEEP_COLOR = (224, 164, 35)      # #E0A423
+GRASS_COLOR = (70, 171, 104)         # #46AB68
+GRAPE_COLOR = (140, 95, 199)         # #8C5FC7
+SKY_COLOR = (63, 169, 221)           # #3FA9DD
+SHADOW_COLOR = (52, 40, 31)          # ink, used at low alpha for drop shadows
+
+BG_COLOR = BOARD_COLOR
+TEXT_COLOR = INK_COLOR
+TITLE_COLOR = TEAL_DEEP_COLOR
+SUBTITLE_COLOR = INK_SOFT_COLOR
+SCROLLBAR_COLOR = BOARD_2_COLOR
+SCROLLBAR_THUMB_COLOR = CORAL_COLOR
+
+CARD_RADIUS = 28
+
+# Placeholder streak count for the new header pill. Real day-by-day streak
+# persistence is a separate feature being built later - this is visual only.
+STREAK_DAYS = 7
 
 GAMES = [
     {
@@ -227,6 +257,135 @@ class Card:
         return self.rect.collidepoint(pos)
 
 
+def draw_sunny(surface, center, size, ticks, spin=True):
+    """Draw Sunny, the bouncy sun mascot, centered at `center` with a given
+    bounding `size` (diameter). Animates a gentle vertical bob plus a slow
+    ray rotation using pygame.time.get_ticks() values passed in via `ticks`.
+    """
+    t = ticks / 1000.0
+
+    # Gentle bob: matches the mockup's 3.4s ease-in-out bob cycle.
+    bob = math.sin(t * (2 * math.pi / 3.4)) * (size * 0.09)
+    cx, cy = center[0], center[1] + bob
+
+    # Slow ray rotation (a full turn every ~22s, like the mockup's spin).
+    rotation = (t * (360.0 / 22.0)) if spin else 0.0
+
+    face_radius = size * 0.32
+
+    # 8 chunky rounded rays, alternating long/wide (cardinal) and
+    # short/narrow (diagonal), same proportions as the reference mockup.
+    for i in range(8):
+        angle_deg = i * 45 + rotation
+        angle_rad = math.radians(angle_deg)
+        if i % 2 == 0:
+            length = size * 0.46
+            width = size * 0.20
+        else:
+            length = size * 0.38
+            width = size * 0.16
+        dx, dy = math.cos(angle_rad), math.sin(angle_rad)
+        perp_x, perp_y = -dy, dx
+        half_w = width / 2
+        tip = (cx + dx * length, cy + dy * length)
+        base = (cx, cy)
+        points = [
+            (base[0] + perp_x * half_w, base[1] + perp_y * half_w),
+            (tip[0] + perp_x * half_w, tip[1] + perp_y * half_w),
+            (tip[0] - perp_x * half_w, tip[1] - perp_y * half_w),
+            (base[0] - perp_x * half_w, base[1] - perp_y * half_w),
+        ]
+        pygame.draw.polygon(surface, SUN_COLOR, points)
+        pygame.draw.circle(surface, SUN_COLOR, (int(tip[0]), int(tip[1])), int(half_w))
+
+    # Face (drawn after rays so it hides the ray bases).
+    pygame.draw.circle(surface, SUN_COLOR, (int(cx), int(cy)), int(face_radius))
+
+    # Eyes.
+    eye_offset_x = size * 0.11
+    eye_y = cy - size * 0.08
+    eye_r = max(2, int(size * 0.06))
+    pygame.draw.circle(surface, INK_COLOR, (int(cx - eye_offset_x), int(eye_y)), eye_r)
+    pygame.draw.circle(surface, INK_COLOR, (int(cx + eye_offset_x), int(eye_y)), eye_r)
+
+    # Rosy cheeks - small translucent coral circles.
+    cheek_offset_x = size * 0.30
+    cheek_y = cy + size * 0.06
+    cheek_r = max(2, int(size * 0.08))
+    cheek_surf = pygame.Surface((cheek_r * 2, cheek_r * 2), pygame.SRCALPHA)
+    pygame.draw.circle(cheek_surf, (*CORAL_COLOR, 140), (cheek_r, cheek_r), cheek_r)
+    surface.blit(cheek_surf, (cx - cheek_offset_x - cheek_r, cheek_y - cheek_r))
+    surface.blit(cheek_surf, (cx + cheek_offset_x - cheek_r, cheek_y - cheek_r))
+
+    # Curved smile.
+    smile_w = size * 0.34
+    smile_h = size * 0.24
+    smile_rect = pygame.Rect(0, 0, int(smile_w), int(smile_h * 2))
+    smile_rect.center = (int(cx), int(cy + size * 0.02))
+    smile_thickness = max(2, int(size * 0.045))
+    pygame.draw.arc(surface, INK_COLOR, smile_rect, math.pi, 2 * math.pi, smile_thickness)
+
+
+def draw_card_shadow(surface, rect, radius, hovered):
+    """Layer a few large, low-alpha rounded rects behind a card to fake a
+    soft drop shadow (pygame has no native box-shadow blur)."""
+    if hovered:
+        layers = [(0, 18, 40), (0, 12, 55), (0, 7, 70)]
+    else:
+        layers = [(0, 10, 35), (0, 6, 50)]
+    pad = 24
+    for dx, dy, alpha in layers:
+        shadow_surf = pygame.Surface((rect.width + pad * 2, rect.height + pad * 2), pygame.SRCALPHA)
+        shadow_rect = pygame.Rect(pad, pad, rect.width, rect.height)
+        pygame.draw.rect(shadow_surf, (*SHADOW_COLOR, alpha), shadow_rect, border_radius=radius)
+        surface.blit(shadow_surf, (rect.x - pad + dx, rect.y - pad + dy))
+
+
+def draw_streak_pill(surface, right_x, top_y, font, days):
+    """Draw the coral streak pill (flame icon + day count) used in the
+    header. `right_x` is the pill's right edge x-coordinate."""
+    text_surf = font.render(str(days), True, CORAL_DEEP_COLOR)
+    flame_d = font.get_height() * 0.6
+    pad_x, pad_y, gap = 14, 8, 8
+    pill_w = int(flame_d + gap + text_surf.get_width() + pad_x * 2)
+    pill_h = int(max(flame_d, text_surf.get_height()) + pad_y * 2)
+    pill_rect = pygame.Rect(0, 0, pill_w, pill_h)
+    pill_rect.topright = (right_x, top_y)
+
+    shadow_surf = pygame.Surface((pill_w + 16, pill_h + 16), pygame.SRCALPHA)
+    pygame.draw.rect(
+        shadow_surf, (*SHADOW_COLOR, 45), (8, 8 + 4, pill_w, pill_h), border_radius=pill_h // 2
+    )
+    surface.blit(shadow_surf, (pill_rect.x - 8, pill_rect.y - 8))
+    pygame.draw.rect(surface, PAPER_COLOR, pill_rect, border_radius=pill_h // 2)
+
+    # Flame icon: a square rounded on three corners (sharp bottom-left),
+    # rotated 45 degrees into a teardrop - same trick as the mockup's CSS
+    # `border-radius: 50% 50% 50% 0; transform: rotate(45deg)`.
+    flame_cx = pill_rect.x + pad_x + flame_d / 2
+    flame_cy = pill_rect.centery
+    d = int(flame_d)
+    flame_surf = pygame.Surface((d, d), pygame.SRCALPHA)
+    pygame.draw.rect(
+        flame_surf,
+        CORAL_COLOR,
+        (0, 0, d, d),
+        border_top_left_radius=d // 2,
+        border_top_right_radius=d // 2,
+        border_bottom_right_radius=d // 2,
+        border_bottom_left_radius=0,
+    )
+    flame_surf = pygame.transform.rotate(flame_surf, -45)
+    flame_rect = flame_surf.get_rect(center=(int(flame_cx), int(flame_cy)))
+    surface.blit(flame_surf, flame_rect)
+
+    surface.blit(
+        text_surf,
+        text_surf.get_rect(midleft=(flame_cx + flame_d / 2 + gap, pill_rect.centery)),
+    )
+    return pill_rect
+
+
 def layout_cards():
     cards = []
     for i, game in enumerate(GAMES):
@@ -272,10 +431,11 @@ def main():
     clock = pygame.time.Clock()
     load_images()
 
-    title_font = pygame.font.SysFont(None, 64, bold=True)
-    subtitle_font = pygame.font.SysFont(None, 28)
-    name_font = pygame.font.SysFont(None, 34, bold=True)
-    comment_font = pygame.font.SysFont(None, 22)
+    title_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-ExtraBold.ttf"), 56)
+    subtitle_font = pygame.font.Font(str(FONTS_DIR / "Nunito-Bold.ttf"), 22)
+    name_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 28)
+    comment_font = pygame.font.Font(str(FONTS_DIR / "Nunito-Regular.ttf"), 18)
+    streak_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 20)
 
     cards = layout_cards()
     max_scroll = max(0, content_height(cards) - HEIGHT)
@@ -309,22 +469,41 @@ def main():
                         load_images()
                         break
 
+        ticks = pygame.time.get_ticks()
+
         content = pygame.Surface((WIDTH, content_height(cards)))
         content.fill(BG_COLOR)
 
+        # ---- Header: Sunny + title, subtitle, streak pill ----
         title_surf = title_font.render("Kid Zone", True, TITLE_COLOR)
-        content.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, 60)))
+        title_rect = title_surf.get_rect(center=(WIDTH // 2, 62))
+        mascot_size = 64
+        mascot_center = (title_rect.left - mascot_size * 0.55 - 10, title_rect.centery)
+        draw_sunny(content, mascot_center, mascot_size, ticks)
+        content.blit(title_surf, title_rect)
+
         subtitle_surf = subtitle_font.render(
             "Pick a game to play!", True, SUBTITLE_COLOR
         )
-        content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 100)))
+        content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 104)))
+
+        draw_streak_pill(content, WIDTH - 24, 22, streak_font, STREAK_DAYS)
 
         for card in cards:
             hovered = card.is_hovered(mouse_content_pos)
             color = card.game["hover"] if hovered else card.game["color"]
-            rect = card.rect.inflate(6, 6) if hovered else card.rect
-            pygame.draw.rect(content, color, rect, border_radius=18)
-            pygame.draw.rect(content, (255, 255, 255), rect, width=3, border_radius=18)
+
+            if hovered:
+                scale = 1.05
+                w, h = int(CARD_W * scale), int(CARD_H * scale)
+                rect = pygame.Rect(0, 0, w, h)
+                rect.center = card.rect.center
+            else:
+                rect = card.rect
+
+            draw_card_shadow(content, rect, CARD_RADIUS, hovered)
+            pygame.draw.rect(content, color, rect, border_radius=CARD_RADIUS)
+            pygame.draw.rect(content, PAPER_COLOR, rect, width=3, border_radius=CARD_RADIUS)
 
             image = card.game["image_surface"]
             img_top = rect.top + 18

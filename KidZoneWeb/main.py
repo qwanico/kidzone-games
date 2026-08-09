@@ -1,26 +1,53 @@
 import asyncio
 import importlib
+import math
 from pathlib import Path
 
 import pygame
 
 BASE_DIR = Path(__file__).parent
 ICONS_DIR = BASE_DIR / "tile_icons"
+FONTS_DIR = BASE_DIR / "fonts"
 
 WIDTH, HEIGHT = 1000, 700
 CARD_W, CARD_H = 280, 260
 CARD_GAP = 40
 COLS = 3
 IMAGE_SIZE = 110
-TOP_Y = 150
+TOP_Y = 165
 BOTTOM_MARGIN = 40
 SCROLL_SPEED = 60
-SCROLLBAR_COLOR = (210, 210, 220)
-SCROLLBAR_THUMB_COLOR = (160, 160, 180)
+CARD_RADIUS = 26
 
-BG_COLOR = (245, 245, 250)
-TITLE_COLOR = (60, 60, 90)
-SUBTITLE_COLOR = (110, 110, 130)
+# ---------------------------------------------------------------------------
+# Design tokens - warm cream "felt-board" palette (matches the approved
+# HTML mockup: https://claude.ai/code/artifact/198bd155-dfec-4b83-bb83-bc0dec3eec30)
+# ---------------------------------------------------------------------------
+BOARD_COLOR = (247, 236, 216)       # #F7ECD8 - background
+BOARD_2_COLOR = (241, 226, 198)     # #F1E2C6 - secondary panel
+INK_COLOR = (52, 40, 31)            # #34281F - primary text
+INK_SOFT_COLOR = (107, 90, 72)      # #6B5A48 - secondary text
+PAPER_COLOR = (255, 251, 242)       # #FFFBF2 - card/paper surface
+LINE_COLOR = (230, 214, 179)        # #E6D6B3 - hairline / track color
+TEAL_COLOR = (15, 141, 131)         # #0F8D83 - brand teal
+TEAL_DEEP_COLOR = (10, 107, 99)     # #0A6B63
+CORAL_COLOR = (255, 107, 82)        # #FF6B52 - energy / streak
+CORAL_DEEP_COLOR = (225, 80, 58)    # #E1503A
+SUN_COLOR = (255, 194, 60)          # #FFC23C - mascot / rewards
+SUN_DEEP_COLOR = (224, 164, 35)     # #E0A423
+GRASS_COLOR = (70, 171, 104)        # #46AB68
+GRAPE_COLOR = (140, 95, 199)        # #8C5FC7
+SKY_COLOR = (63, 169, 221)          # #3FA9DD
+
+BG_COLOR = BOARD_COLOR
+TITLE_COLOR = TEAL_DEEP_COLOR
+SUBTITLE_COLOR = INK_SOFT_COLOR
+TEXT_COLOR = INK_COLOR
+SCROLLBAR_COLOR = LINE_COLOR
+SCROLLBAR_THUMB_COLOR = TEAL_COLOR
+
+# Streak pill placeholder - real persistence is a separate follow-up phase.
+STREAK_DAYS = 7
 
 GAMES = [
     {
@@ -256,6 +283,130 @@ def load_images():
         )
 
 
+def make_background(width, height):
+    """Warm cream felt-board backdrop with two soft highlight washes,
+    approximating the mockup's radial-gradient body background."""
+    bg = pygame.Surface((width, height))
+    bg.fill(BOARD_COLOR)
+    highlight = pygame.Surface((width, height), pygame.SRCALPHA)
+    r1 = int(width * 0.32)
+    pygame.draw.circle(highlight, (255, 255, 255, 40), (int(width * 0.18), int(height * 0.05)), r1)
+    r2 = int(width * 0.28)
+    pygame.draw.circle(
+        highlight, (255, 255, 255, 28), (int(width * 0.85), int(height * 0.35)), r2
+    )
+    bg.blit(highlight, (0, 0))
+    return bg
+
+
+def draw_soft_shadow(surface, rect, radius, offset_y=8, pad=6, alpha=70):
+    """Draw a soft drop-shadow behind a rounded rect using a layered,
+    semi-transparent SRCALPHA surface (pygame has no native box-shadow)."""
+    shadow_w = rect.width + pad * 2
+    shadow_h = rect.height + pad * 2
+    shadow_surf = pygame.Surface((shadow_w, shadow_h), pygame.SRCALPHA)
+    pygame.draw.rect(
+        shadow_surf,
+        (*INK_COLOR, alpha),
+        shadow_surf.get_rect(),
+        border_radius=radius + pad,
+    )
+    surface.blit(shadow_surf, (rect.x - pad, rect.y - pad + offset_y))
+
+
+def draw_teardrop(surface, center, radius, color, angle_deg=0, alpha=255):
+    """A rounded droplet shape (circle + point), rotated to taste.
+    Used both standalone (streak flame) and as a building block."""
+    size = radius * 4
+    temp = pygame.Surface((size, size), pygame.SRCALPHA)
+    c = size // 2
+    fill = (*color, alpha) if alpha < 255 else color
+    pygame.draw.circle(temp, fill, (c, c + radius), radius)
+    tip = (c, c - radius * 2)
+    left = (c - radius, c + radius)
+    right = (c + radius, c + radius)
+    pygame.draw.polygon(temp, fill, [left, right, tip])
+    rotated = pygame.transform.rotate(temp, angle_deg)
+    surface.blit(rotated, rotated.get_rect(center=center))
+
+
+def draw_sunny(surface, center, size, ticks):
+    """Draw Sunny the mascot: a gently bobbing sun face with rotating rays,
+    round eyes, rosy cheeks, and a curved smile. Pure per-frame drawing
+    driven by pygame.time.get_ticks(), safe to call every frame inside the
+    async loop (no threads/state needed beyond the ticks argument)."""
+    t = ticks / 1000.0
+    bob = math.sin(t * (2 * math.pi / 3.4)) * (size * 0.09)
+    cx = center[0]
+    cy = center[1] + bob
+
+    face_r = size * 0.28
+    ray_len = size * 0.24
+    ray_w = size * 0.11
+    n_rays = 8
+    spin_deg = (ticks / 1000.0) * 9.0  # slow continuous rotation
+
+    for i in range(n_rays):
+        angle = math.radians(i * (360 / n_rays) + spin_deg)
+        ray_surf = pygame.Surface((ray_w, ray_len), pygame.SRCALPHA)
+        pygame.draw.rect(
+            ray_surf, SUN_COLOR, ray_surf.get_rect(), border_radius=int(ray_w / 2)
+        )
+        rotated = pygame.transform.rotate(ray_surf, -math.degrees(angle))
+        dist = face_r + ray_len * 0.42
+        rx = cx + dist * math.sin(angle)
+        ry = cy - dist * math.cos(angle)
+        surface.blit(rotated, rotated.get_rect(center=(rx, ry)))
+
+    pygame.draw.circle(surface, SUN_DEEP_COLOR, (int(cx), int(cy + face_r * 0.08)), int(face_r))
+    pygame.draw.circle(surface, SUN_COLOR, (int(cx), int(cy)), int(face_r))
+
+    eye_r = max(2, int(face_r * 0.13))
+    eye_off_x = face_r * 0.36
+    eye_off_y = -face_r * 0.08
+    pygame.draw.circle(surface, INK_COLOR, (int(cx - eye_off_x), int(cy + eye_off_y)), eye_r)
+    pygame.draw.circle(surface, INK_COLOR, (int(cx + eye_off_x), int(cy + eye_off_y)), eye_r)
+
+    cheek_r = max(2, int(face_r * 0.2))
+    cheek_off_x = face_r * 0.58
+    cheek_off_y = face_r * 0.18
+    cheek_surf = pygame.Surface((cheek_r * 2, cheek_r * 2), pygame.SRCALPHA)
+    pygame.draw.circle(cheek_surf, (*CORAL_COLOR, 130), (cheek_r, cheek_r), cheek_r)
+    surface.blit(cheek_surf, (int(cx - cheek_off_x - cheek_r), int(cy + cheek_off_y - cheek_r)))
+    surface.blit(cheek_surf, (int(cx + cheek_off_x - cheek_r), int(cy + cheek_off_y - cheek_r)))
+
+    smile_w = face_r * 1.0
+    smile_h = face_r * 0.7
+    smile_rect = pygame.Rect(0, 0, int(smile_w), int(smile_h))
+    smile_rect.center = (int(cx), int(cy + face_r * 0.2))
+    pygame.draw.arc(
+        surface, INK_COLOR, smile_rect, math.radians(200), math.radians(340),
+        max(2, int(face_r * 0.14)),
+    )
+
+
+def draw_streak_pill(surface, right_x, center_y, days, ticks):
+    """Small rounded pill with a coral flame icon + day count, top-right
+    of the header. Visual only for now - real streak persistence is a
+    separate follow-up phase."""
+    pill_h = 40
+    pill_w = 96
+    rect = pygame.Rect(0, 0, pill_w, pill_h)
+    rect.midright = (right_x, center_y)
+
+    draw_soft_shadow(surface, rect, radius=pill_h // 2, offset_y=4, pad=4, alpha=55)
+    pygame.draw.rect(surface, PAPER_COLOR, rect, border_radius=pill_h // 2)
+    pygame.draw.rect(surface, LINE_COLOR, rect, width=2, border_radius=pill_h // 2)
+
+    flicker = math.sin(ticks / 130.0) * 2
+    flame_center = (rect.x + 24, rect.centery)
+    draw_teardrop(surface, flame_center, int(pill_h * 0.19), CORAL_COLOR, angle_deg=180 + flicker)
+
+    font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", 20)
+    num_surf = font.render(str(days), True, CORAL_DEEP_COLOR)
+    surface.blit(num_surf, num_surf.get_rect(midleft=(rect.x + 44, rect.centery)))
+
+
 async def launch_game(game):
     module = importlib.import_module(game["module"])
     if game["entry"] == "class":
@@ -271,15 +422,17 @@ async def main():
     clock = pygame.time.Clock()
     load_images()
 
-    title_font = pygame.font.SysFont(None, 64, bold=True)
-    subtitle_font = pygame.font.SysFont(None, 28)
-    name_font = pygame.font.SysFont(None, 34, bold=True)
-    comment_font = pygame.font.SysFont(None, 22)
+    title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", 54)
+    subtitle_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", 22)
+    name_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", 28)
+    comment_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", 18)
 
     cards = layout_cards()
     max_scroll = max(0, content_height(cards) - HEIGHT)
     scroll = 0
     running = True
+
+    base_bg = make_background(WIDTH, content_height(cards))
 
     DRAG_CLICK_THRESHOLD = 12
     dragging = False
@@ -290,6 +443,7 @@ async def main():
     while running:
         mouse_pos = pygame.mouse.get_pos()
         mouse_content_pos = (mouse_pos[0], mouse_pos[1] + scroll)
+        ticks = pygame.time.get_ticks()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -321,22 +475,42 @@ async def main():
                             break
                 dragging = False
 
-        content = pygame.Surface((WIDTH, content_height(cards)))
-        content.fill(BG_COLOR)
+        content = base_bg.copy()
 
         title_surf = title_font.render("Kid Zone", True, TITLE_COLOR)
-        content.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, 60)))
+        mascot_size = 62
+        gap = 16
+        total_w = mascot_size + gap + title_surf.get_width()
+        start_x = WIDTH // 2 - total_w // 2
+        header_y = 58
+        mascot_center = (start_x + mascot_size // 2, header_y)
+        content.blit(
+            title_surf,
+            title_surf.get_rect(midleft=(start_x + mascot_size + gap, header_y)),
+        )
+        draw_sunny(content, mascot_center, mascot_size, ticks)
+
         subtitle_surf = subtitle_font.render(
             "Pick a game to play!", True, SUBTITLE_COLOR
         )
-        content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 100)))
+        content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 108)))
+
+        draw_streak_pill(content, WIDTH - 40, header_y, STREAK_DAYS, ticks)
 
         for card in cards:
             hovered = card.is_hovered(mouse_content_pos)
             color = card.game["hover"] if hovered else card.game["color"]
-            rect = card.rect.inflate(6, 6) if hovered else card.rect
-            pygame.draw.rect(content, color, rect, border_radius=18)
-            pygame.draw.rect(content, (255, 255, 255), rect, width=3, border_radius=18)
+
+            if hovered:
+                rect = card.rect.inflate(16, 16)
+                rect.centery -= 4
+                draw_soft_shadow(content, rect, CARD_RADIUS, offset_y=16, pad=10, alpha=95)
+            else:
+                rect = card.rect
+                draw_soft_shadow(content, rect, CARD_RADIUS, offset_y=8, pad=6, alpha=70)
+
+            pygame.draw.rect(content, color, rect, border_radius=CARD_RADIUS)
+            pygame.draw.rect(content, PAPER_COLOR, rect, width=3, border_radius=CARD_RADIUS)
 
             image = card.game["image_surface"]
             img_top = rect.top + 18
