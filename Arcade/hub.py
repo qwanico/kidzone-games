@@ -1,3 +1,4 @@
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -24,9 +25,19 @@ TEXT_COLOR = (225, 228, 240)
 TITLE_COLOR = (120, 220, 255)
 SUBTITLE_COLOR = (150, 155, 180)
 
+CATEGORY_ORDER = ["Arcade", "Puzzles", "Skill", "Trivia"]
+SECTION_HEADER_HEIGHT = 50
+CATEGORY_COLORS = {
+    "Arcade": (255, 200, 80),
+    "Puzzles": (180, 140, 255),
+    "Skill": (120, 230, 150),
+    "Trivia": (255, 130, 130),
+}
+
 GAMES = [
     {
         "name": "Snake",
+        "category": "Arcade",
         "comment": "Eat food, grow long,\ndon't hit yourself!",
         "python": GAMES_DIR / "Snake" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Snake" / "snake.py",
@@ -37,6 +48,7 @@ GAMES = [
     },
     {
         "name": "Breakout",
+        "category": "Arcade",
         "comment": "Bounce the ball,\nbreak every brick!",
         "python": GAMES_DIR / "Breakout" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Breakout" / "breakout.py",
@@ -47,6 +59,7 @@ GAMES = [
     },
     {
         "name": "Flappy Bird",
+        "category": "Arcade",
         "comment": "Flap through the\npipes without hitting!",
         "python": GAMES_DIR / "FlappyBird" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "FlappyBird" / "flappy_bird.py",
@@ -57,6 +70,7 @@ GAMES = [
     },
     {
         "name": "2048",
+        "category": "Puzzles",
         "comment": "Slide and merge tiles\nto reach 2048!",
         "python": GAMES_DIR / "Game2048" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Game2048" / "game_2048.py",
@@ -67,6 +81,7 @@ GAMES = [
     },
     {
         "name": "Tic-Tac-Toe",
+        "category": "Puzzles",
         "comment": "Outsmart the AI\nin classic X's and O's!",
         "python": GAMES_DIR / "TicTacToe" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "TicTacToe" / "tic_tac_toe.py",
@@ -77,6 +92,7 @@ GAMES = [
     },
     {
         "name": "Reaction Timer",
+        "category": "Skill",
         "comment": "How fast are your\nreflexes? Test them!",
         "python": GAMES_DIR / "ReactionTimer" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "ReactionTimer" / "reaction_timer.py",
@@ -87,6 +103,7 @@ GAMES = [
     },
     {
         "name": "Rock Paper Scissors",
+        "category": "Arcade",
         "comment": "Beat the computer\nin best of rounds!",
         "python": GAMES_DIR / "RockPaperScissors" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "RockPaperScissors" / "rock_paper_scissors.py",
@@ -97,6 +114,7 @@ GAMES = [
     },
     {
         "name": "Air Hockey",
+        "category": "Skill",
         "comment": "Score goals against\nthe AI paddle!",
         "python": GAMES_DIR / "AirHockey" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "AirHockey" / "air_hockey.py",
@@ -107,6 +125,7 @@ GAMES = [
     },
     {
         "name": "Word Scramble",
+        "category": "Puzzles",
         "comment": "Unscramble the\nletters to spell it!",
         "python": GAMES_DIR / "WordScramble" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "WordScramble" / "word_scramble.py",
@@ -117,6 +136,7 @@ GAMES = [
     },
     {
         "name": "Color Switch",
+        "category": "Arcade",
         "comment": "Stack the blocks,\ndon't miss the edge!",
         "python": GAMES_DIR / "ColorSwitch" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "ColorSwitch" / "color_switch.py",
@@ -127,6 +147,7 @@ GAMES = [
     },
     {
         "name": "Pong",
+        "category": "Arcade",
         "comment": "Classic paddle battle\nagainst the AI!",
         "python": GAMES_DIR / "Pong" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Pong" / "pong.py",
@@ -137,6 +158,7 @@ GAMES = [
     },
     {
         "name": "Space Invaders",
+        "category": "Arcade",
         "comment": "Blast the alien fleet\nbefore they land!",
         "python": GAMES_DIR / "SpaceInvaders" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "SpaceInvaders" / "space_invaders.py",
@@ -147,6 +169,7 @@ GAMES = [
     },
     {
         "name": "Asteroids",
+        "category": "Arcade",
         "comment": "Rotate, thrust, and\nblast the rocks!",
         "python": GAMES_DIR / "Asteroids" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Asteroids" / "asteroids.py",
@@ -157,6 +180,7 @@ GAMES = [
     },
     {
         "name": "Tetris",
+        "category": "Arcade",
         "comment": "Stack the falling\nblocks and clear lines!",
         "python": GAMES_DIR / "Tetris" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Tetris" / "tetris.py",
@@ -167,6 +191,7 @@ GAMES = [
     },
     {
         "name": "Connect Four",
+        "category": "Puzzles",
         "comment": "Drop discs and get\n4 in a row to win!",
         "python": GAMES_DIR / "ConnectFour" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "ConnectFour" / "connect_four.py",
@@ -177,6 +202,7 @@ GAMES = [
     },
     {
         "name": "Minesweeper",
+        "category": "Puzzles",
         "comment": "Clear the board without\nhitting a mine!",
         "python": GAMES_DIR / "Minesweeper" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Minesweeper" / "minesweeper.py",
@@ -187,6 +213,7 @@ GAMES = [
     },
     {
         "name": "Pinball",
+        "category": "Arcade",
         "comment": "Flip the flippers,\nrack up the score!",
         "python": GAMES_DIR / "Pinball" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Pinball" / "pinball.py",
@@ -197,6 +224,7 @@ GAMES = [
     },
     {
         "name": "Typing Speed Test",
+        "category": "Trivia",
         "comment": "How fast can you\ntype the phrase?",
         "python": GAMES_DIR / "TypingTest" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "TypingTest" / "typing_test.py",
@@ -207,6 +235,7 @@ GAMES = [
     },
     {
         "name": "Archery",
+        "category": "Skill",
         "comment": "Aim, charge power,\nand hit the bullseye!",
         "python": GAMES_DIR / "Archery" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Archery" / "archery.py",
@@ -217,6 +246,7 @@ GAMES = [
     },
     {
         "name": "Trivia",
+        "category": "Trivia",
         "comment": "Answer questions and\ntest your knowledge!",
         "python": GAMES_DIR / "Trivia" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Trivia" / "trivia.py",
@@ -238,18 +268,44 @@ class Card:
 
 
 def layout_cards():
+    """Lay the grid out section-by-section (Arcade / Puzzles / Skill /
+    Trivia) rather than as one flat grid. Returns (cards, section_headers)
+    where section_headers is a list of (label, color, top_y)."""
     cards = []
-    for i, game in enumerate(GAMES):
-        row, col = divmod(i, COLS)
-        row_start = row * COLS
-        row_count = min(COLS, len(GAMES) - row_start)
-        row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
-        row_start_x = (WIDTH - row_w) // 2
+    section_headers = []
+    y = TOP_Y
+    for category in CATEGORY_ORDER:
+        games_in_category = [g for g in GAMES if g["category"] == category]
+        if not games_in_category:
+            continue
 
-        x = row_start_x + col * (CARD_W + CARD_GAP)
-        y = TOP_Y + row * (CARD_H + CARD_GAP)
-        cards.append(Card(game, (x, y, CARD_W, CARD_H)))
-    return cards
+        section_headers.append((category, CATEGORY_COLORS[category], y))
+        y += SECTION_HEADER_HEIGHT
+
+        for i, game in enumerate(games_in_category):
+            row, col = divmod(i, COLS)
+            row_start = row * COLS
+            row_count = min(COLS, len(games_in_category) - row_start)
+            row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
+            row_start_x = (WIDTH - row_w) // 2
+
+            x = row_start_x + col * (CARD_W + CARD_GAP)
+            card_y = y + row * (CARD_H + CARD_GAP)
+            cards.append(Card(game, (x, card_y, CARD_W, CARD_H)))
+
+        rows = math.ceil(len(games_in_category) / COLS)
+        y += rows * (CARD_H + CARD_GAP)
+
+    return cards, section_headers
+
+
+def draw_section_header(surface, label, color, top_y, font):
+    text_surf = font.render(label, True, color)
+    text_rect = text_surf.get_rect(midtop=(WIDTH // 2, top_y + 4))
+    surface.blit(text_surf, text_rect)
+    underline_rect = pygame.Rect(0, 0, max(70, text_rect.width + 24), 3)
+    underline_rect.midtop = (WIDTH // 2, text_rect.bottom + 5)
+    pygame.draw.rect(surface, color, underline_rect, border_radius=2)
 
 
 def content_height(cards):
@@ -286,8 +342,9 @@ def main():
     subtitle_font = pygame.font.SysFont(None, 26)
     name_font = pygame.font.SysFont(None, 30, bold=True)
     comment_font = pygame.font.SysFont(None, 20)
+    section_font = pygame.font.SysFont(None, 30, bold=True)
 
-    cards = layout_cards()
+    cards, section_headers = layout_cards()
     max_scroll = max(0, content_height(cards) - HEIGHT)
     scroll = 0
     running = True
@@ -328,6 +385,9 @@ def main():
             "Pick a game to play!", True, SUBTITLE_COLOR
         )
         content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 100)))
+
+        for label, color, top_y in section_headers:
+            draw_section_header(content, label, color, top_y, section_font)
 
         for card in cards:
             hovered = card.is_hovered(mouse_content_pos)

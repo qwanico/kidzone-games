@@ -63,6 +63,7 @@ GAMES = [
     {
         "key": "feelings",
         "name": "Feelings",
+        "category": "Learn",
         "comment": "Pick the word that\nmatches the face!",
         "module": "games.feelings",
         "entry": "class",
@@ -73,6 +74,7 @@ GAMES = [
     {
         "key": "fruit_finder",
         "name": "Find The Food",
+        "category": "Learn",
         "comment": "Find the fruit or\nveggie that's named!",
         "module": "games.fruit_finder",
         "entry": "function",
@@ -83,6 +85,7 @@ GAMES = [
     {
         "key": "letters",
         "name": "Letters",
+        "category": "Learn",
         "comment": "Listen, then click\nthe letter you hear!",
         "module": "games.letters",
         "entry": "class",
@@ -93,6 +96,7 @@ GAMES = [
     {
         "key": "sight_words",
         "name": "Sight Words",
+        "category": "Learn",
         "comment": "Listen, then click\nthe word you hear!",
         "module": "games.sight_words",
         "entry": "class",
@@ -103,6 +107,7 @@ GAMES = [
     {
         "key": "picture_words",
         "name": "Which Word",
+        "category": "Learn",
         "comment": "Pick the word that\nmatches the picture!",
         "module": "games.picture_words",
         "entry": "class",
@@ -113,6 +118,7 @@ GAMES = [
     {
         "key": "planets",
         "name": "Planets",
+        "category": "Learn",
         "comment": "Put the planets\nin order from the Sun!",
         "module": "games.planets",
         "entry": "class",
@@ -123,6 +129,7 @@ GAMES = [
     {
         "key": "shapes",
         "name": "Shapes",
+        "category": "Learn",
         "comment": "Listen, then click\nthe shape you hear!",
         "module": "games.shapes",
         "entry": "class",
@@ -133,6 +140,7 @@ GAMES = [
     {
         "key": "counting",
         "name": "Counting",
+        "category": "Learn",
         "comment": "Listen, then click\nthe number you hear!",
         "module": "games.counting",
         "entry": "class",
@@ -143,6 +151,7 @@ GAMES = [
     {
         "key": "colors",
         "name": "Colors",
+        "category": "Learn",
         "comment": "Listen, then click\nthe color you hear!",
         "module": "games.colors",
         "entry": "class",
@@ -153,6 +162,7 @@ GAMES = [
     {
         "key": "math",
         "name": "Math",
+        "category": "Learn",
         "comment": "Listen, then click\nthe answer you hear!",
         "module": "games.math_game",
         "entry": "class",
@@ -163,6 +173,7 @@ GAMES = [
     {
         "key": "whack_a_mole",
         "name": "Whack-a-Mole",
+        "category": "Active",
         "comment": "Click the moles\nbefore they hide!",
         "module": "games.whack_a_mole",
         "entry": "function",
@@ -173,6 +184,7 @@ GAMES = [
     {
         "key": "balloon_pop",
         "name": "Balloon Pop",
+        "category": "Active",
         "comment": "Pop balloons, dodge\nthe bombs!",
         "module": "games.balloon_pop",
         "entry": "function",
@@ -183,6 +195,7 @@ GAMES = [
     {
         "key": "bug_squasher",
         "name": "Bug Squasher",
+        "category": "Active",
         "comment": "Click the bugs before\nthey scurry away!",
         "module": "games.bug_squasher",
         "entry": "function",
@@ -193,6 +206,7 @@ GAMES = [
     {
         "key": "fish_catch",
         "name": "Fish Catch",
+        "category": "Active",
         "comment": "Click the fish, avoid\nthe junk!",
         "module": "games.fish_catch",
         "entry": "function",
@@ -203,6 +217,7 @@ GAMES = [
     {
         "key": "star_catcher",
         "name": "Star Catcher",
+        "category": "Active",
         "comment": "Catch falling stars,\ndodge the rocks!",
         "module": "games.star_catcher",
         "entry": "function",
@@ -213,6 +228,7 @@ GAMES = [
     {
         "key": "memory_match",
         "name": "Memory Match",
+        "category": "Puzzles",
         "comment": "Flip cards to find\nmatching pairs!",
         "module": "games.memory_match",
         "entry": "function",
@@ -223,6 +239,7 @@ GAMES = [
     {
         "key": "jumping_jack",
         "name": "Jumping Jack",
+        "category": "Active",
         "comment": "Jump over obstacles\nto keep the score up!",
         "module": "games.jumping_jack",
         "entry": "function",
@@ -233,6 +250,7 @@ GAMES = [
     {
         "key": "maze",
         "name": "Maze",
+        "category": "Puzzles",
         "comment": "Guide the hero\nthrough the maze!",
         "module": "games.maze",
         "entry": "class",
@@ -243,6 +261,7 @@ GAMES = [
     {
         "key": "simon_pattern",
         "name": "Simon Pattern",
+        "category": "Puzzles",
         "comment": "Watch the pattern,\nthen click it back!",
         "module": "games.simon_pattern",
         "entry": "class",
@@ -448,19 +467,54 @@ class Card:
         return self.rect.collidepoint(pos)
 
 
-def layout_cards():
-    cards = []
-    for i, game in enumerate(GAMES):
-        row, col = divmod(i, COLS)
-        row_start = row * COLS
-        row_count = min(COLS, len(GAMES) - row_start)
-        row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
-        row_start_x = (WIDTH - row_w) // 2
+CATEGORY_ORDER = ["Learn", "Puzzles", "Active"]
+SECTION_HEADER_HEIGHT = 56
+CATEGORY_COLORS = {
+    "Learn": TEAL_COLOR,
+    "Puzzles": GRAPE_COLOR,
+    "Active": CORAL_COLOR,
+}
 
-        x = row_start_x + col * (CARD_W + CARD_GAP)
-        y = TOP_Y + row * (CARD_H + CARD_GAP)
-        cards.append(Card(game, (x, y, CARD_W, CARD_H)))
-    return cards
+
+def layout_cards():
+    """Lay the grid out section-by-section (Learn / Puzzles / Active) rather
+    than as one flat grid. Returns (cards, section_headers) where
+    section_headers is a list of (label, color, top_y)."""
+    cards = []
+    section_headers = []
+    y = TOP_Y
+    for category in CATEGORY_ORDER:
+        games_in_category = [g for g in GAMES if g["category"] == category]
+        if not games_in_category:
+            continue
+
+        section_headers.append((category, CATEGORY_COLORS[category], y))
+        y += SECTION_HEADER_HEIGHT
+
+        for i, game in enumerate(games_in_category):
+            row, col = divmod(i, COLS)
+            row_start = row * COLS
+            row_count = min(COLS, len(games_in_category) - row_start)
+            row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
+            row_start_x = (WIDTH - row_w) // 2
+
+            x = row_start_x + col * (CARD_W + CARD_GAP)
+            card_y = y + row * (CARD_H + CARD_GAP)
+            cards.append(Card(game, (x, card_y, CARD_W, CARD_H)))
+
+        rows = math.ceil(len(games_in_category) / COLS)
+        y += rows * (CARD_H + CARD_GAP)
+
+    return cards, section_headers
+
+
+def draw_section_header(surface, label, color, top_y, font):
+    text_surf = font.render(label, True, color)
+    text_rect = text_surf.get_rect(midtop=(WIDTH // 2, top_y + 6))
+    surface.blit(text_surf, text_rect)
+    underline_rect = pygame.Rect(0, 0, max(70, text_rect.width + 24), 4)
+    underline_rect.midtop = (WIDTH // 2, text_rect.bottom + 6)
+    pygame.draw.rect(surface, color, underline_rect, border_radius=2)
 
 
 def content_height(cards):
@@ -793,7 +847,8 @@ async def main():
     badge_label_font = pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", 15)
     button_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", 22)
 
-    cards = layout_cards()
+    cards, section_headers = layout_cards()
+    section_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", 26)
     max_scroll = max(0, content_height(cards) - HEIGHT)
     scroll = 0
     running = True
@@ -964,6 +1019,9 @@ async def main():
 
             nav_hovered = nav_rect.collidepoint(mouse_content_pos)
             draw_icon_button(content, nav_rect.center, gear_radius, nav_hovered, draw_arcade_icon)
+
+            for label, color, top_y in section_headers:
+                draw_section_header(content, label, color, top_y, section_font)
 
             for card in cards:
                 hovered = card.is_hovered(mouse_content_pos)

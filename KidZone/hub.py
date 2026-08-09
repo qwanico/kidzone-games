@@ -59,10 +59,18 @@ CARD_RADIUS = 28
 SETTINGS_GEAR_RADIUS = 22
 SETTINGS_GEAR_GAP = 14
 
+# ---------------------------------------------------------------------------
+# Category grouping - each game carries a "category" and the home screen is
+# laid out section-by-section (see layout_cards()) rather than one flat grid.
+# ---------------------------------------------------------------------------
+CATEGORY_ORDER = ["Learn", "Puzzles", "Active"]
+SECTION_HEADER_HEIGHT = 56
+
 GAMES = [
     {
         "name": "Feelings",
         "comment": "Pick the word that\nmatches the face!",
+        "category": "Learn",
         "python": GAMES_DIR / "Feelings" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Feelings" / "feelings.py",
         "cwd": GAMES_DIR / "Feelings",
@@ -73,6 +81,7 @@ GAMES = [
     {
         "name": "Find The Food",
         "comment": "Find the fruit or\nveggie that's named!",
+        "category": "Learn",
         "python": GAMES_DIR / "FruitFinder" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "FruitFinder" / "fruit_finder.py",
         "cwd": GAMES_DIR / "FruitFinder",
@@ -83,6 +92,7 @@ GAMES = [
     {
         "name": "Letters",
         "comment": "Listen, then click\nthe letter you hear!",
+        "category": "Learn",
         "python": GAMES_DIR / "Letters" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Letters" / "letters.py",
         "cwd": GAMES_DIR / "Letters",
@@ -93,6 +103,7 @@ GAMES = [
     {
         "name": "Sight Words",
         "comment": "Listen, then click\nthe word you hear!",
+        "category": "Learn",
         "python": GAMES_DIR / "SightWords" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "SightWords" / "sight_words.py",
         "cwd": GAMES_DIR / "SightWords",
@@ -103,6 +114,7 @@ GAMES = [
     {
         "name": "Which Word",
         "comment": "Pick the word that\nmatches the picture!",
+        "category": "Learn",
         "python": GAMES_DIR / "PictureWords" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "PictureWords" / "picture_words.py",
         "cwd": GAMES_DIR / "PictureWords",
@@ -113,6 +125,7 @@ GAMES = [
     {
         "name": "Planets",
         "comment": "Put the planets\nin order from the Sun!",
+        "category": "Learn",
         "python": GAMES_DIR / "Planets" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Planets" / "planets.py",
         "cwd": GAMES_DIR / "Planets",
@@ -123,6 +136,7 @@ GAMES = [
     {
         "name": "Shapes",
         "comment": "Listen, then click\nthe shape you hear!",
+        "category": "Learn",
         "python": GAMES_DIR / "Shapes" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Shapes" / "shapes.py",
         "cwd": GAMES_DIR / "Shapes",
@@ -133,6 +147,7 @@ GAMES = [
     {
         "name": "Counting",
         "comment": "Listen, then click\nthe number you hear!",
+        "category": "Learn",
         "python": GAMES_DIR / "Counting" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Counting" / "counting.py",
         "cwd": GAMES_DIR / "Counting",
@@ -143,6 +158,7 @@ GAMES = [
     {
         "name": "Colors",
         "comment": "Listen, then click\nthe color you hear!",
+        "category": "Learn",
         "python": GAMES_DIR / "Colors" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Colors" / "colors.py",
         "cwd": GAMES_DIR / "Colors",
@@ -153,6 +169,7 @@ GAMES = [
     {
         "name": "Math",
         "comment": "Listen, then click\nthe answer you hear!",
+        "category": "Learn",
         "python": GAMES_DIR / "Math" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Math" / "math_game.py",
         "cwd": GAMES_DIR / "Math",
@@ -161,58 +178,9 @@ GAMES = [
         "image": ICONS_DIR / "math.png",
     },
     {
-        "name": "Whack-a-Mole",
-        "comment": "Click the moles\nbefore they hide!",
-        "python": GAMES_DIR / "WhackAMole" / "gameenv" / "bin" / "python",
-        "script": GAMES_DIR / "WhackAMole" / "whack_a_mole.py",
-        "cwd": GAMES_DIR / "WhackAMole",
-        "color": (140, 100, 70),
-        "hover": (120, 82, 55),
-        "image": GAMES_DIR / "WhackAMole" / "assets" / "whackamole_icon.png",
-    },
-    {
-        "name": "Balloon Pop",
-        "comment": "Pop balloons, dodge\nthe bombs!",
-        "python": GAMES_DIR / "BalloonPop" / "gameenv" / "bin" / "python",
-        "script": GAMES_DIR / "BalloonPop" / "balloon_pop.py",
-        "cwd": GAMES_DIR / "BalloonPop",
-        "color": (70, 200, 220),
-        "hover": (55, 175, 195),
-        "image": GAMES_DIR / "BalloonPop" / "assets" / "balloonpop_icon.png",
-    },
-    {
-        "name": "Bug Squasher",
-        "comment": "Click the bugs before\nthey scurry away!",
-        "python": GAMES_DIR / "BugSquasher" / "gameenv" / "bin" / "python",
-        "script": GAMES_DIR / "BugSquasher" / "bug_squasher.py",
-        "cwd": GAMES_DIR / "BugSquasher",
-        "color": (110, 140, 80),
-        "hover": (92, 122, 64),
-        "image": GAMES_DIR / "BugSquasher" / "assets" / "bugsquasher_icon.png",
-    },
-    {
-        "name": "Fish Catch",
-        "comment": "Click the fish, avoid\nthe junk!",
-        "python": GAMES_DIR / "FishCatch" / "gameenv" / "bin" / "python",
-        "script": GAMES_DIR / "FishCatch" / "fish_catch.py",
-        "cwd": GAMES_DIR / "FishCatch",
-        "color": (40, 120, 190),
-        "hover": (30, 100, 170),
-        "image": GAMES_DIR / "FishCatch" / "assets" / "fishcatch_icon.png",
-    },
-    {
-        "name": "Star Catcher",
-        "comment": "Catch falling stars,\ndodge the rocks!",
-        "python": GAMES_DIR / "StarCatcher" / "gameenv" / "bin" / "python",
-        "script": GAMES_DIR / "StarCatcher" / "star_catcher.py",
-        "cwd": GAMES_DIR / "StarCatcher",
-        "color": (60, 55, 110),
-        "hover": (45, 42, 90),
-        "image": GAMES_DIR / "StarCatcher" / "assets" / "starcatcher_icon.png",
-    },
-    {
         "name": "Memory Match",
         "comment": "Flip cards to find\nmatching pairs!",
+        "category": "Puzzles",
         "python": GAMES_DIR / "MemoryMatch" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "MemoryMatch" / "memory_match.py",
         "cwd": GAMES_DIR / "MemoryMatch",
@@ -221,18 +189,9 @@ GAMES = [
         "image": GAMES_DIR / "MemoryMatch" / "assets" / "memorymatch_icon.png",
     },
     {
-        "name": "Jumping Jack",
-        "comment": "Jump over obstacles\nto keep the score up!",
-        "python": GAMES_DIR / "JumpingJack" / "gameenv" / "bin" / "python",
-        "script": GAMES_DIR / "JumpingJack" / "jumping_jack.py",
-        "cwd": GAMES_DIR / "JumpingJack",
-        "color": (221, 235, 100),
-        "hover": (200, 215, 85),
-        "image": GAMES_DIR / "JumpingJack" / "assets" / "jumpingjack_icon.png",
-    },
-    {
         "name": "Maze",
         "comment": "Guide the hero\nthrough the maze!",
+        "category": "Puzzles",
         "python": GAMES_DIR / "Maze" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "Maze" / "maze.py",
         "cwd": GAMES_DIR / "Maze",
@@ -243,6 +202,7 @@ GAMES = [
     {
         "name": "Simon Pattern",
         "comment": "Watch the pattern,\nthen click it back!",
+        "category": "Puzzles",
         "python": GAMES_DIR / "SimonPattern" / "gameenv" / "bin" / "python",
         "script": GAMES_DIR / "SimonPattern" / "simon_pattern.py",
         "cwd": GAMES_DIR / "SimonPattern",
@@ -250,7 +210,79 @@ GAMES = [
         "hover": (160, 35, 112),
         "image": ICONS_DIR / "simon_pattern.png",
     },
+    {
+        "name": "Whack-a-Mole",
+        "comment": "Click the moles\nbefore they hide!",
+        "category": "Active",
+        "python": GAMES_DIR / "WhackAMole" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "WhackAMole" / "whack_a_mole.py",
+        "cwd": GAMES_DIR / "WhackAMole",
+        "color": (140, 100, 70),
+        "hover": (120, 82, 55),
+        "image": GAMES_DIR / "WhackAMole" / "assets" / "whackamole_icon.png",
+    },
+    {
+        "name": "Balloon Pop",
+        "comment": "Pop balloons, dodge\nthe bombs!",
+        "category": "Active",
+        "python": GAMES_DIR / "BalloonPop" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "BalloonPop" / "balloon_pop.py",
+        "cwd": GAMES_DIR / "BalloonPop",
+        "color": (70, 200, 220),
+        "hover": (55, 175, 195),
+        "image": GAMES_DIR / "BalloonPop" / "assets" / "balloonpop_icon.png",
+    },
+    {
+        "name": "Bug Squasher",
+        "comment": "Click the bugs before\nthey scurry away!",
+        "category": "Active",
+        "python": GAMES_DIR / "BugSquasher" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "BugSquasher" / "bug_squasher.py",
+        "cwd": GAMES_DIR / "BugSquasher",
+        "color": (110, 140, 80),
+        "hover": (92, 122, 64),
+        "image": GAMES_DIR / "BugSquasher" / "assets" / "bugsquasher_icon.png",
+    },
+    {
+        "name": "Fish Catch",
+        "comment": "Click the fish, avoid\nthe junk!",
+        "category": "Active",
+        "python": GAMES_DIR / "FishCatch" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "FishCatch" / "fish_catch.py",
+        "cwd": GAMES_DIR / "FishCatch",
+        "color": (40, 120, 190),
+        "hover": (30, 100, 170),
+        "image": GAMES_DIR / "FishCatch" / "assets" / "fishcatch_icon.png",
+    },
+    {
+        "name": "Star Catcher",
+        "comment": "Catch falling stars,\ndodge the rocks!",
+        "category": "Active",
+        "python": GAMES_DIR / "StarCatcher" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "StarCatcher" / "star_catcher.py",
+        "cwd": GAMES_DIR / "StarCatcher",
+        "color": (60, 55, 110),
+        "hover": (45, 42, 90),
+        "image": GAMES_DIR / "StarCatcher" / "assets" / "starcatcher_icon.png",
+    },
+    {
+        "name": "Jumping Jack",
+        "comment": "Jump over obstacles\nto keep the score up!",
+        "category": "Active",
+        "python": GAMES_DIR / "JumpingJack" / "gameenv" / "bin" / "python",
+        "script": GAMES_DIR / "JumpingJack" / "jumping_jack.py",
+        "cwd": GAMES_DIR / "JumpingJack",
+        "color": (221, 235, 100),
+        "hover": (200, 215, 85),
+        "image": GAMES_DIR / "JumpingJack" / "assets" / "jumpingjack_icon.png",
+    },
 ]
+
+CATEGORY_COLORS = {
+    "Learn": TEAL_COLOR,
+    "Puzzles": GRAPE_COLOR,
+    "Active": CORAL_COLOR,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -839,18 +871,45 @@ def draw_settings_screen(surface, progress, mouse_pos, fonts, confirm_reset):
 
 
 def layout_cards():
+    """Lay the grid out section-by-section (Learn / Puzzles / Active) rather
+    than as one flat grid, so the home screen reads as organized categories.
+    Returns (cards, section_headers) where section_headers is a list of
+    (label, color, top_y) for the draw code to render above each group."""
     cards = []
-    for i, game in enumerate(GAMES):
-        row, col = divmod(i, COLS)
-        row_start = row * COLS
-        row_count = min(COLS, len(GAMES) - row_start)
-        row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
-        row_start_x = (WIDTH - row_w) // 2
+    section_headers = []
+    y = TOP_Y
+    for category in CATEGORY_ORDER:
+        games_in_category = [g for g in GAMES if g["category"] == category]
+        if not games_in_category:
+            continue
 
-        x = row_start_x + col * (CARD_W + CARD_GAP)
-        y = TOP_Y + row * (CARD_H + CARD_GAP)
-        cards.append(Card(game, (x, y, CARD_W, CARD_H)))
-    return cards
+        section_headers.append((category, CATEGORY_COLORS[category], y))
+        y += SECTION_HEADER_HEIGHT
+
+        for i, game in enumerate(games_in_category):
+            row, col = divmod(i, COLS)
+            row_start = row * COLS
+            row_count = min(COLS, len(games_in_category) - row_start)
+            row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
+            row_start_x = (WIDTH - row_w) // 2
+
+            x = row_start_x + col * (CARD_W + CARD_GAP)
+            card_y = y + row * (CARD_H + CARD_GAP)
+            cards.append(Card(game, (x, card_y, CARD_W, CARD_H)))
+
+        rows = math.ceil(len(games_in_category) / COLS)
+        y += rows * (CARD_H + CARD_GAP)
+
+    return cards, section_headers
+
+
+def draw_section_header(surface, label, color, top_y, font):
+    text_surf = font.render(label, True, color)
+    text_rect = text_surf.get_rect(midtop=(WIDTH // 2, top_y + 6))
+    surface.blit(text_surf, text_rect)
+    underline_rect = pygame.Rect(0, 0, max(70, text_rect.width + 24), 4)
+    underline_rect.midtop = (WIDTH // 2, text_rect.bottom + 6)
+    pygame.draw.rect(surface, color, underline_rect, border_radius=2)
 
 
 def content_height(cards):
@@ -896,19 +955,21 @@ def main():
     name_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 28)
     comment_font = pygame.font.Font(str(FONTS_DIR / "Nunito-Regular.ttf"), 18)
     streak_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 20)
+    section_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 26)
     fonts = {
         "title": title_font,
         "subtitle": subtitle_font,
         "name": name_font,
         "comment": comment_font,
         "streak": streak_font,
+        "section": section_font,
     }
 
     # ---- Real progress/streak tracking, loaded once at startup ----
     progress = load_progress()
     update_streak(progress)
 
-    cards = layout_cards()
+    cards, section_headers = layout_cards()
     max_scroll = max(0, content_height(cards) - HEIGHT)
     scroll = 0
     running = True
@@ -1032,6 +1093,9 @@ def main():
         draw_streak_pill(content, WIDTH - 24, 22, streak_font, progress["streak_days"])
         gear_hovered = settings_button_rect.collidepoint(mouse_content_pos)
         draw_settings_button(content, gear_center, SETTINGS_GEAR_RADIUS, gear_hovered)
+
+        for label, color, top_y in section_headers:
+            draw_section_header(content, label, color, top_y, section_font)
 
         for card in cards:
             hovered = card.is_hovered(mouse_content_pos)

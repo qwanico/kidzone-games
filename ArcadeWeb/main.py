@@ -1,5 +1,6 @@
 import asyncio
 import importlib
+import math
 from pathlib import Path
 
 import pygame
@@ -33,45 +34,45 @@ NAV_BUTTON_HOVER = (58, 63, 88)
 NAV_BUTTON_BORDER = (120, 220, 255)
 
 GAMES = [
-    {"key": "snake", "name": "Snake", "comment": "Eat food, grow long,\ndon't hit yourself!",
+    {"key": "snake", "name": "Snake", "category": "Arcade", "comment": "Eat food, grow long,\ndon't hit yourself!",
      "module": "games.snake", "entry": "function", "color": (60, 140, 95), "hover": (48, 120, 78)},
-    {"key": "breakout", "name": "Breakout", "comment": "Bounce the ball,\nbreak every brick!",
+    {"key": "breakout", "name": "Breakout", "category": "Arcade", "comment": "Bounce the ball,\nbreak every brick!",
      "module": "games.breakout", "entry": "function", "color": (90, 100, 160), "hover": (72, 82, 140)},
-    {"key": "flappy_bird", "name": "Flappy Bird", "comment": "Flap through the\npipes without hitting!",
+    {"key": "flappy_bird", "name": "Flappy Bird", "category": "Arcade", "comment": "Flap through the\npipes without hitting!",
      "module": "games.flappy_bird", "entry": "function", "color": (70, 150, 190), "hover": (55, 130, 170)},
-    {"key": "game_2048", "name": "2048", "comment": "Slide and merge tiles\nto reach 2048!",
+    {"key": "game_2048", "name": "2048", "category": "Puzzles", "comment": "Slide and merge tiles\nto reach 2048!",
      "module": "games.game_2048", "entry": "function", "color": (150, 120, 90), "hover": (130, 102, 74)},
-    {"key": "tic_tac_toe", "name": "Tic-Tac-Toe", "comment": "Outsmart the AI\nin classic X's and O's!",
+    {"key": "tic_tac_toe", "name": "Tic-Tac-Toe", "category": "Puzzles", "comment": "Outsmart the AI\nin classic X's and O's!",
      "module": "games.tic_tac_toe", "entry": "function", "color": (70, 76, 100), "hover": (56, 62, 84)},
-    {"key": "reaction_timer", "name": "Reaction Timer", "comment": "How fast are your\nreflexes? Test them!",
+    {"key": "reaction_timer", "name": "Reaction Timer", "category": "Skill", "comment": "How fast are your\nreflexes? Test them!",
      "module": "games.reaction_timer", "entry": "function", "color": (150, 70, 160), "hover": (130, 56, 140)},
-    {"key": "rock_paper_scissors", "name": "Rock Paper Scissors", "comment": "Beat the computer\nin best of rounds!",
+    {"key": "rock_paper_scissors", "name": "Rock Paper Scissors", "category": "Arcade", "comment": "Beat the computer\nin best of rounds!",
      "module": "games.rock_paper_scissors", "entry": "function", "color": (190, 110, 70), "hover": (170, 92, 55)},
-    {"key": "air_hockey", "name": "Air Hockey", "comment": "Score goals against\nthe AI paddle!",
+    {"key": "air_hockey", "name": "Air Hockey", "category": "Skill", "comment": "Score goals against\nthe AI paddle!",
      "module": "games.air_hockey", "entry": "function", "color": (40, 90, 130), "hover": (30, 74, 110)},
-    {"key": "word_scramble", "name": "Word Scramble", "comment": "Unscramble the\nletters to spell it!",
+    {"key": "word_scramble", "name": "Word Scramble", "category": "Puzzles", "comment": "Unscramble the\nletters to spell it!",
      "module": "games.word_scramble", "entry": "function", "color": (80, 150, 140), "hover": (64, 130, 120)},
-    {"key": "color_switch", "name": "Color Switch", "comment": "Stack the blocks,\ndon't miss the edge!",
+    {"key": "color_switch", "name": "Color Switch", "category": "Arcade", "comment": "Stack the blocks,\ndon't miss the edge!",
      "module": "games.color_switch", "entry": "function", "color": (170, 90, 130), "hover": (150, 74, 112)},
-    {"key": "pong", "name": "Pong", "comment": "Classic paddle battle\nagainst the AI!",
+    {"key": "pong", "name": "Pong", "category": "Arcade", "comment": "Classic paddle battle\nagainst the AI!",
      "module": "games.pong", "entry": "function", "color": (232, 232, 233), "hover": (210, 210, 212)},
-    {"key": "space_invaders", "name": "Space Invaders", "comment": "Blast the alien fleet\nbefore they land!",
+    {"key": "space_invaders", "name": "Space Invaders", "category": "Arcade", "comment": "Blast the alien fleet\nbefore they land!",
      "module": "games.space_invaders", "entry": "function", "color": (235, 235, 80), "hover": (215, 215, 60)},
-    {"key": "asteroids", "name": "Asteroids", "comment": "Rotate, thrust, and\nblast the rocks!",
+    {"key": "asteroids", "name": "Asteroids", "category": "Arcade", "comment": "Rotate, thrust, and\nblast the rocks!",
      "module": "games.asteroids", "entry": "function", "color": (117, 233, 37), "hover": (97, 213, 20)},
-    {"key": "tetris", "name": "Tetris", "comment": "Stack the falling\nblocks and clear lines!",
+    {"key": "tetris", "name": "Tetris", "category": "Arcade", "comment": "Stack the falling\nblocks and clear lines!",
      "module": "games.tetris", "entry": "function", "color": (227, 115, 235), "hover": (207, 95, 215)},
-    {"key": "connect_four", "name": "Connect Four", "comment": "Drop discs and get\n4 in a row to win!",
+    {"key": "connect_four", "name": "Connect Four", "category": "Puzzles", "comment": "Drop discs and get\n4 in a row to win!",
      "module": "games.connect_four", "entry": "function", "color": (143, 233, 159), "hover": (123, 213, 139)},
-    {"key": "minesweeper", "name": "Minesweeper", "comment": "Clear the board without\nhitting a mine!",
+    {"key": "minesweeper", "name": "Minesweeper", "category": "Puzzles", "comment": "Clear the board without\nhitting a mine!",
      "module": "games.minesweeper", "entry": "function", "color": (43, 36, 234), "hover": (34, 28, 210)},
-    {"key": "pinball", "name": "Pinball", "comment": "Flip the flippers,\nrack up the score!",
+    {"key": "pinball", "name": "Pinball", "category": "Arcade", "comment": "Flip the flippers,\nrack up the score!",
      "module": "games.pinball", "entry": "function", "color": (37, 235, 133), "hover": (28, 213, 115)},
-    {"key": "typing_test", "name": "Typing Speed Test", "comment": "How fast can you\ntype the phrase?",
+    {"key": "typing_test", "name": "Typing Speed Test", "category": "Trivia", "comment": "How fast can you\ntype the phrase?",
      "module": "games.typing_test", "entry": "function", "color": (40, 234, 233), "hover": (30, 213, 212)},
-    {"key": "archery", "name": "Archery", "comment": "Aim, charge power,\nand hit the bullseye!",
+    {"key": "archery", "name": "Archery", "category": "Skill", "comment": "Aim, charge power,\nand hit the bullseye!",
      "module": "games.archery", "entry": "function", "color": (224, 171, 154), "hover": (204, 151, 134)},
-    {"key": "trivia", "name": "Trivia", "comment": "Answer questions and\ntest your knowledge!",
+    {"key": "trivia", "name": "Trivia", "category": "Trivia", "comment": "Answer questions and\ntest your knowledge!",
      "module": "games.trivia", "entry": "function", "color": (137, 36, 40), "hover": (117, 28, 32)},
 ]
 
@@ -88,19 +89,55 @@ class Card:
         return self.rect.collidepoint(pos)
 
 
-def layout_cards():
-    cards = []
-    for i, game in enumerate(GAMES):
-        row, col = divmod(i, COLS)
-        row_start = row * COLS
-        row_count = min(COLS, len(GAMES) - row_start)
-        row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
-        row_start_x = (WIDTH - row_w) // 2
+CATEGORY_ORDER = ["Arcade", "Puzzles", "Skill", "Trivia"]
+SECTION_HEADER_HEIGHT = 50
+CATEGORY_COLORS = {
+    "Arcade": (255, 200, 80),
+    "Puzzles": (180, 140, 255),
+    "Skill": (120, 230, 150),
+    "Trivia": (255, 130, 130),
+}
 
-        x = row_start_x + col * (CARD_W + CARD_GAP)
-        y = TOP_Y + row * (CARD_H + CARD_GAP)
-        cards.append(Card(game, (x, y, CARD_W, CARD_H)))
-    return cards
+
+def layout_cards():
+    """Lay the grid out section-by-section (Arcade / Puzzles / Skill /
+    Trivia) rather than as one flat grid. Returns (cards, section_headers)
+    where section_headers is a list of (label, color, top_y)."""
+    cards = []
+    section_headers = []
+    y = TOP_Y
+    for category in CATEGORY_ORDER:
+        games_in_category = [g for g in GAMES if g["category"] == category]
+        if not games_in_category:
+            continue
+
+        section_headers.append((category, CATEGORY_COLORS[category], y))
+        y += SECTION_HEADER_HEIGHT
+
+        for i, game in enumerate(games_in_category):
+            row, col = divmod(i, COLS)
+            row_start = row * COLS
+            row_count = min(COLS, len(games_in_category) - row_start)
+            row_w = row_count * CARD_W + max(0, row_count - 1) * CARD_GAP
+            row_start_x = (WIDTH - row_w) // 2
+
+            x = row_start_x + col * (CARD_W + CARD_GAP)
+            card_y = y + row * (CARD_H + CARD_GAP)
+            cards.append(Card(game, (x, card_y, CARD_W, CARD_H)))
+
+        rows = math.ceil(len(games_in_category) / COLS)
+        y += rows * (CARD_H + CARD_GAP)
+
+    return cards, section_headers
+
+
+def draw_section_header(surface, label, color, top_y, font):
+    text_surf = font.render(label, True, color)
+    text_rect = text_surf.get_rect(midtop=(WIDTH // 2, top_y + 4))
+    surface.blit(text_surf, text_rect)
+    underline_rect = pygame.Rect(0, 0, max(70, text_rect.width + 24), 3)
+    underline_rect.midtop = (WIDTH // 2, text_rect.bottom + 5)
+    pygame.draw.rect(surface, color, underline_rect, border_radius=2)
 
 
 def content_height(cards):
@@ -149,8 +186,9 @@ async def main():
     name_font = pygame.font.SysFont(None, 30, bold=True)
     comment_font = pygame.font.SysFont(None, 20)
     nav_font = pygame.font.SysFont(None, 22, bold=True)
+    section_font = pygame.font.SysFont(None, 30, bold=True)
 
-    cards = layout_cards()
+    cards, section_headers = layout_cards()
     max_scroll = max(0, content_height(cards) - HEIGHT)
     scroll = 0
     running = True
@@ -193,6 +231,9 @@ async def main():
             "Pick a game to play!", True, SUBTITLE_COLOR
         )
         content.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, 100)))
+
+        for label, color, top_y in section_headers:
+            draw_section_header(content, label, color, top_y, section_font)
 
         for card in cards:
             hovered = card.is_hovered(mouse_content_pos)
