@@ -819,6 +819,40 @@ for fruit in fruits:
 
 shake_fruit = None
 correct_fruit = None
+shake_start_time = 0.0
+
+WRONG_FLASH_DURATION = 0.6
+
+
+def draw_check_badge(cx, cy):
+
+    r = 24
+
+    pygame.draw.circle(screen, GREEN, (cx, cy), r)
+    pygame.draw.circle(screen, WHITE, (cx, cy), r, 3)
+
+    pygame.draw.lines(
+        screen,
+        WHITE,
+        False,
+        [(cx - 11, cy), (cx - 3, cy + 9), (cx + 13, cy - 11)],
+        5
+    )
+
+
+def draw_x_badge(cx, cy, alpha):
+
+    r = 24
+
+    badge = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+
+    pygame.draw.circle(badge, (*RED, alpha), (r, r), r)
+    pygame.draw.circle(badge, (255, 255, 255, alpha), (r, r), r, 3)
+
+    pygame.draw.line(badge, (255, 255, 255, alpha), (r - 10, r - 10), (r + 10, r + 10), 5)
+    pygame.draw.line(badge, (255, 255, 255, alpha), (r - 10, r + 10), (r + 10, r - 10), 5)
+
+    screen.blit(badge, (cx - r, cy - r))
 
 
 # ---------------- BACKGROUND ----------------
@@ -984,9 +1018,11 @@ def draw_fruits():
 
 
 
-        # shake wrong fruit
+        # shake wrong fruit (brief - fades out rather than shaking forever)
 
-        if fruit == shake_fruit:
+        wrong_elapsed = time.time() - shake_start_time
+
+        if fruit == shake_fruit and wrong_elapsed < WRONG_FLASH_DURATION:
 
             draw_x += random.randint(
                 -8,
@@ -1002,7 +1038,7 @@ def draw_fruits():
 
 
 
-        # correct circle
+        # correct circle + green check badge
 
         if fruit == correct_fruit:
 
@@ -1013,6 +1049,17 @@ def draw_fruits():
                 65,
                 6
             )
+
+            draw_check_badge(x + 95, y + 15)
+
+
+        # friendly red X badge, fading out over WRONG_FLASH_DURATION
+
+        if fruit == shake_fruit and wrong_elapsed < WRONG_FLASH_DURATION:
+
+            alpha = max(0, int(255 * (1 - wrong_elapsed / WRONG_FLASH_DURATION)))
+
+            draw_x_badge(x + 95, y + 15, alpha)
 
 
 
@@ -2019,6 +2066,7 @@ while running:
 
 
                             shake_fruit = fruit
+                            shake_start_time = time.time()
 
                             streak = 0
 
