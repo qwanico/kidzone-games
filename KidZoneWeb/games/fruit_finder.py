@@ -12,6 +12,11 @@ try:
 except ImportError:
     gTTS = None
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 pygame.init()
 
 BASE_DIR = Path(__file__).parent / "fruit_finder_assets"
@@ -1824,6 +1829,11 @@ async def run():
     global timer_remaining
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     pygame.display.set_caption("Find The Food")
     pygame.display.set_icon(pygame.image.load(str(BASE_DIR / "assets" / "app_icon.png")))
 

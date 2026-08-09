@@ -4,6 +4,11 @@ import sys
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 600, 720
 GRID_SIZE = 4
 TILE, GAP = 120, 14
@@ -157,6 +162,11 @@ async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("2048")
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     clock = pygame.time.Clock()
 
     title_font = pygame.font.SysFont(None, 64, bold=True)

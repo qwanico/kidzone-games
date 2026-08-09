@@ -3,6 +3,11 @@ import sys
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 600, 800
 BG_COLOR = (22, 24, 34)
 TEXT_COLOR = (255, 255, 255)
@@ -86,6 +91,11 @@ async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Color Switch")
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     clock = pygame.time.Clock()
 
     title_font = pygame.font.SysFont(None, 48, bold=True)

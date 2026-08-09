@@ -4,6 +4,11 @@ import sys
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 800, 800
 GRID_SIZE = 20
 COLS, ROWS = WIDTH // GRID_SIZE, HEIGHT // GRID_SIZE
@@ -67,6 +72,11 @@ async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Snake")
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     clock = pygame.time.Clock()
 
     hud_font = pygame.font.SysFont(None, 34, bold=True)

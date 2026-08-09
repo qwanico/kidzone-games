@@ -3,6 +3,11 @@ import sys
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 800, 700
 BG_COLOR = (18, 20, 30)
 TEXT_COLOR = (230, 230, 240)
@@ -88,6 +93,11 @@ async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Breakout")
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     clock = pygame.time.Clock()
 
     hud_font = pygame.font.SysFont(None, 34, bold=True)

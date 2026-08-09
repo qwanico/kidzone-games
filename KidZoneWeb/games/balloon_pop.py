@@ -4,6 +4,11 @@ import random
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 900, 700
 BG_TOP = (150, 200, 245)
 BG_BOTTOM = (210, 235, 250)
@@ -339,6 +344,11 @@ def _wobble(now, phase):
 async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     pygame.display.set_caption("Balloon Pop")
     clock = pygame.time.Clock()
     frame = pygame.Surface((WIDTH, HEIGHT))

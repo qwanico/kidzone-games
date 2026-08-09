@@ -4,6 +4,11 @@ import sys
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 500, 750
 BG_TOP = (110, 190, 230)
 BG_BOTTOM = (200, 230, 245)
@@ -99,6 +104,11 @@ async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Flappy Bird")
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     clock = pygame.time.Clock()
 
     hud_font = pygame.font.SysFont(None, 46, bold=True)

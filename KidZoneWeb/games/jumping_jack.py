@@ -4,6 +4,11 @@ import random
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 900, 600
 BG_TOP = (255, 200, 150)
 BG_MID = (255, 225, 180)
@@ -261,6 +266,11 @@ def draw_particles(screen, particles):
 async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     pygame.display.set_caption("Jumping Jack")
     clock = pygame.time.Clock()
     frame = pygame.Surface((WIDTH, HEIGHT))

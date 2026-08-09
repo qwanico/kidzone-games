@@ -4,6 +4,11 @@ import random
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 900, 750
 BG_COLOR = (245, 240, 250)
 TABLE_COLOR = (228, 220, 245)
@@ -301,6 +306,11 @@ def draw_milestone(screen, font, text):
 async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     pygame.display.set_caption("Memory Match")
     clock = pygame.time.Clock()
 

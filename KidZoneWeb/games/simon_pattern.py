@@ -5,6 +5,11 @@ from pathlib import Path
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 BASE_DIR = Path(__file__).parent / "simon_pattern_assets"
 SOUNDS_DIR = BASE_DIR / "sounds"
 
@@ -181,6 +186,11 @@ class Game:
         pygame.mixer.init()
 
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+        if platform is not None and hasattr(platform, "window"):
+            try:
+                platform.window.window_resize()
+            except Exception:
+                pass
         pygame.display.set_caption("Simon Pattern")
 
         self.font_title = pygame.font.SysFont("arial", 64, bold=True)

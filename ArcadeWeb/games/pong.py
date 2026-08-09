@@ -6,6 +6,11 @@ from pathlib import Path
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 BASE_DIR = Path(__file__).parent / "pong_assets"
 SOUNDS_DIR = BASE_DIR / "sounds"
 
@@ -152,6 +157,11 @@ class Game:
 
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
         pygame.display.set_caption("Pong")
+        if platform is not None and hasattr(platform, "window"):
+            try:
+                platform.window.window_resize()
+            except Exception:
+                pass
 
         self.font_title = pygame.font.SysFont("arial", 68, bold=True)
         self.font_subtitle = pygame.font.SysFont("arial", 24)

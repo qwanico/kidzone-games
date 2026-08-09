@@ -5,6 +5,11 @@ import sys
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 600, 800
 TABLE_COLOR = (30, 60, 90)
 LINE_COLOR = (80, 130, 170)
@@ -88,6 +93,11 @@ async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Air Hockey")
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     clock = pygame.time.Clock()
 
     title_font = pygame.font.SysFont(None, 48, bold=True)

@@ -4,6 +4,11 @@ import sys
 
 import pygame
 
+try:
+    import platform
+except ImportError:
+    platform = None
+
 WIDTH, HEIGHT = 900, 650
 BG_COLOR = (26, 28, 40)
 TEXT_COLOR = (230, 230, 240)
@@ -103,6 +108,11 @@ async def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Word Scramble")
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     clock = pygame.time.Clock()
 
     title_font = pygame.font.SysFont(None, 56, bold=True)
