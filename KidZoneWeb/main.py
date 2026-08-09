@@ -502,8 +502,15 @@ def layout_cards(active_category):
     return cards
 
 
+TAB_ICON_SIZE = int(TAB_HEIGHT * 0.5)
+TAB_ICON_GAP = 8
+
+
 def category_tab_rects(font):
-    widths = [font.size(cat)[0] + TAB_PAD_X * 2 for cat in CATEGORY_ORDER]
+    widths = [
+        TAB_ICON_SIZE + TAB_ICON_GAP + font.size(cat)[0] + TAB_PAD_X * 2
+        for cat in CATEGORY_ORDER
+    ]
     total_w = sum(widths) + TAB_GAP * (len(widths) - 1)
     start_x = (WIDTH - total_w) // 2
     rects = []
@@ -520,6 +527,7 @@ def draw_category_tabs(surface, active_category, mouse_pos, font):
         color = CATEGORY_COLORS[cat]
         is_active = cat == active_category
         hovered = rect.collidepoint(mouse_pos)
+        draw_soft_shadow(surface, rect, rect.height // 2, offset_y=3, pad=6, alpha=40)
         if is_active:
             pygame.draw.rect(surface, color, rect, border_radius=rect.height // 2)
             text_color = PAPER_COLOR
@@ -529,7 +537,12 @@ def draw_category_tabs(surface, active_category, mouse_pos, font):
             pygame.draw.rect(surface, color, rect, width=2, border_radius=rect.height // 2)
             text_color = color
         text_surf = font.render(cat, True, text_color)
-        surface.blit(text_surf, text_surf.get_rect(center=rect.center))
+        content_w = TAB_ICON_SIZE + TAB_ICON_GAP + text_surf.get_width()
+        content_x = rect.centerx - content_w / 2
+        icon_center = (content_x + TAB_ICON_SIZE / 2, rect.centery)
+        CATEGORY_GLYPHS[cat](surface, icon_center, TAB_ICON_SIZE, text_color)
+        text_x = content_x + TAB_ICON_SIZE + TAB_ICON_GAP
+        surface.blit(text_surf, text_surf.get_rect(midleft=(text_x, rect.centery)))
     return rects
 
 
@@ -799,6 +812,55 @@ def draw_glyph_heart(surface, center, r, color):
     left_p = (center[0] - r, center[1] - lobe_r * 0.1)
     right_p = (center[0] + r, center[1] - lobe_r * 0.1)
     pygame.draw.polygon(surface, color, [left_p, right_p, tip])
+
+
+# ---------------------------------------------------------------------------
+# Category tab icons - same hand-drawn-primitive style as the achievement
+# glyphs above, just simpler silhouettes that read clearly at tab-icon size.
+# ---------------------------------------------------------------------------
+
+
+def draw_glyph_book(surface, center, size, color):
+    cx, cy = center
+    w, h = size * 0.42, size * 0.62
+    gap = max(1, size * 0.05)
+    r = max(1, int(size * 0.1))
+    left_rect = pygame.Rect(0, 0, w, h)
+    left_rect.topright = (cx - gap / 2, cy - h / 2)
+    right_rect = pygame.Rect(0, 0, w, h)
+    right_rect.topleft = (cx + gap / 2, cy - h / 2)
+    pygame.draw.rect(surface, color, left_rect, border_top_left_radius=r, border_bottom_left_radius=r)
+    pygame.draw.rect(surface, color, right_rect, border_top_right_radius=r, border_bottom_right_radius=r)
+
+
+def draw_glyph_puzzle(surface, center, size, color):
+    cx, cy = center
+    s = size * 0.62
+    rect = pygame.Rect(0, 0, s, s)
+    rect.center = (cx, cy)
+    pygame.draw.rect(surface, color, rect, border_radius=max(1, int(size * 0.08)))
+    pygame.draw.circle(surface, color, (int(cx + s / 2), int(cy)), max(1, int(size * 0.14)))
+
+
+def draw_glyph_bolt(surface, center, size, color):
+    cx, cy = center
+    s = size * 0.5
+    pts = [
+        (cx - s * 0.1, cy - s),
+        (cx + s * 0.4, cy - s * 0.05),
+        (cx + s * 0.05, cy - s * 0.05),
+        (cx + s * 0.1, cy + s),
+        (cx - s * 0.4, cy + s * 0.05),
+        (cx - s * 0.05, cy + s * 0.05),
+    ]
+    pygame.draw.polygon(surface, color, pts)
+
+
+CATEGORY_GLYPHS = {
+    "Learn": draw_glyph_book,
+    "Puzzles": draw_glyph_puzzle,
+    "Active": draw_glyph_bolt,
+}
 
 
 ACHIEVEMENTS = [

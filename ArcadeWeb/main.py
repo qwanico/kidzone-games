@@ -12,6 +12,7 @@ except ImportError:
 
 BASE_DIR = Path(__file__).parent
 ICONS_DIR = BASE_DIR / "tile_icons"
+FONTS_DIR = BASE_DIR / "fonts"
 
 WIDTH, HEIGHT = 1100, 800
 CARD_W, CARD_H = 250, 230
@@ -24,7 +25,6 @@ SCROLLBAR_COLOR = (50, 54, 70)
 SCROLLBAR_THUMB_COLOR = (100, 106, 130)
 
 BG_COLOR = (24, 26, 38)
-TEXT_COLOR = (225, 228, 240)
 TITLE_COLOR = (120, 220, 255)
 SUBTITLE_COLOR = (150, 155, 180)
 
@@ -105,6 +105,114 @@ CATEGORY_COLORS = {
 }
 
 
+def make_glow_background(width, height):
+    """Dark arcade-cabinet backdrop: flat navy plus a couple of soft,
+    low-alpha color blooms for a bit of atmosphere behind the header/grid."""
+    bg = pygame.Surface((width, height))
+    bg.fill(BG_COLOR)
+    glow = pygame.Surface((width, height), pygame.SRCALPHA)
+    pygame.draw.circle(
+        glow, (*TITLE_COLOR, 20), (int(width * 0.16), int(height * 0.08)), int(width * 0.26)
+    )
+    pygame.draw.circle(
+        glow, (180, 120, 255, 16), (int(width * 0.86), int(height * 0.3)), int(width * 0.22)
+    )
+    bg.blit(glow, (0, 0))
+    return bg
+
+
+def draw_glow_shadow(surface, rect, color, radius, hovered):
+    """Soft colored halo behind a card, like a backlit arcade button -
+    brighter/wider when hovered."""
+    layers = [(0, 20, 55), (0, 12, 75), (0, 6, 95)] if hovered else [(0, 12, 30), (0, 6, 45)]
+    pad = 22
+    for dx, dy, alpha in layers:
+        shadow_surf = pygame.Surface((rect.width + pad * 2, rect.height + pad * 2), pygame.SRCALPHA)
+        pygame.draw.rect(shadow_surf, (*color, alpha), (pad, pad, rect.width, rect.height), border_radius=radius)
+        surface.blit(shadow_surf, (rect.x - pad + dx, rect.y - pad + dy))
+
+
+def draw_card_gloss(surface, rect, radius):
+    """A faint glass-like sheen across the top of a card."""
+    gloss_h = max(radius, int(rect.height * 0.45))
+    gloss_surf = pygame.Surface((rect.width, gloss_h), pygame.SRCALPHA)
+    pygame.draw.rect(
+        gloss_surf, (255, 255, 255, 24), gloss_surf.get_rect(),
+        border_top_left_radius=radius, border_top_right_radius=radius,
+    )
+    surface.blit(gloss_surf, rect.topleft)
+
+
+def draw_title_glow(surface, rect, color):
+    for pad, alpha in ((40, 10), (26, 16), (14, 24)):
+        glow_surf = pygame.Surface((rect.width + pad * 2, rect.height + pad * 2), pygame.SRCALPHA)
+        pygame.draw.ellipse(glow_surf, (*color, alpha), glow_surf.get_rect())
+        surface.blit(glow_surf, (rect.x - pad, rect.y - pad))
+
+
+def readable_text_color(bg_color):
+    """Pick near-black or near-white text depending on a card's own
+    background brightness, so light cards (Pong, Archery) stay legible
+    instead of using the same light-on-light text as dark cards."""
+    r, g, b = bg_color[:3]
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    if luminance > 150:
+        return (30, 32, 44), (70, 74, 92)
+    return (255, 255, 255), (200, 204, 220)
+
+
+# ---------------------------------------------------------------------------
+# Category tab icons - simple hand-drawn-primitive silhouettes that read
+# clearly at small tab-icon size.
+# ---------------------------------------------------------------------------
+
+
+def glyph_joystick(surface, center, size, color):
+    cx, cy = center
+    base_r = size * 0.28
+    base_rect = pygame.Rect(0, 0, base_r * 2, base_r * 0.9)
+    base_rect.center = (cx, cy + size * 0.22)
+    pygame.draw.ellipse(surface, color, base_rect)
+    pygame.draw.line(
+        surface, color, (cx, cy + size * 0.15), (cx, cy - size * 0.28),
+        max(2, int(size * 0.14)),
+    )
+    pygame.draw.circle(surface, color, (int(cx), int(cy - size * 0.32)), max(2, int(size * 0.18)))
+
+
+def glyph_puzzle(surface, center, size, color):
+    cx, cy = center
+    s = size * 0.62
+    rect = pygame.Rect(0, 0, s, s)
+    rect.center = (cx, cy)
+    pygame.draw.rect(surface, color, rect, border_radius=max(1, int(size * 0.08)))
+    pygame.draw.circle(surface, color, (int(cx + s / 2), int(cy)), max(1, int(size * 0.14)))
+
+
+def glyph_target(surface, center, size, color):
+    cx, cy = center
+    pygame.draw.circle(surface, color, (int(cx), int(cy)), max(2, int(size * 0.42)), width=max(2, int(size * 0.1)))
+    pygame.draw.circle(surface, color, (int(cx), int(cy)), max(1, int(size * 0.2)), width=max(1, int(size * 0.08)))
+    pygame.draw.circle(surface, color, (int(cx), int(cy)), max(1, int(size * 0.08)))
+
+
+def glyph_question(surface, center, size, color):
+    cx, cy = center
+    r = size * 0.22
+    rect = pygame.Rect(0, 0, r * 2, r * 2)
+    rect.center = (cx, cy - size * 0.16)
+    pygame.draw.arc(surface, color, rect, math.radians(-40), math.radians(230), max(2, int(size * 0.12)))
+    pygame.draw.circle(surface, color, (int(cx), int(cy + size * 0.32)), max(2, int(size * 0.07)))
+
+
+CATEGORY_GLYPHS = {
+    "Arcade": glyph_joystick,
+    "Puzzles": glyph_puzzle,
+    "Skill": glyph_target,
+    "Trivia": glyph_question,
+}
+
+
 def layout_cards(active_category):
     """Lay out just the given category's games in a grid, using local
     coordinates starting at y=0 (the caller positions the resulting grid
@@ -125,8 +233,15 @@ def layout_cards(active_category):
     return cards
 
 
+TAB_ICON_SIZE = int(TAB_HEIGHT * 0.5)
+TAB_ICON_GAP = 8
+
+
 def category_tab_rects(font):
-    widths = [font.size(cat)[0] + TAB_PAD_X * 2 for cat in CATEGORY_ORDER]
+    widths = [
+        TAB_ICON_SIZE + TAB_ICON_GAP + font.size(cat)[0] + TAB_PAD_X * 2
+        for cat in CATEGORY_ORDER
+    ]
     total_w = sum(widths) + TAB_GAP * (len(widths) - 1)
     start_x = (WIDTH - total_w) // 2
     rects = []
@@ -144,6 +259,12 @@ def draw_category_tabs(surface, active_category, mouse_pos, font):
         is_active = cat == active_category
         hovered = rect.collidepoint(mouse_pos)
         if is_active:
+            for pad, alpha in ((16, 12), (9, 20)):
+                glow_surf = pygame.Surface((rect.width + pad * 2, rect.height + pad * 2), pygame.SRCALPHA)
+                pygame.draw.rect(
+                    glow_surf, (*color, alpha), glow_surf.get_rect(), border_radius=rect.height // 2
+                )
+                surface.blit(glow_surf, (rect.x - pad, rect.y - pad))
             pygame.draw.rect(surface, color, rect, border_radius=rect.height // 2)
             text_color = BG_COLOR
         else:
@@ -152,7 +273,12 @@ def draw_category_tabs(surface, active_category, mouse_pos, font):
             pygame.draw.rect(surface, color, rect, width=2, border_radius=rect.height // 2)
             text_color = color
         text_surf = font.render(cat, True, text_color)
-        surface.blit(text_surf, text_surf.get_rect(center=rect.center))
+        content_w = TAB_ICON_SIZE + TAB_ICON_GAP + text_surf.get_width()
+        content_x = rect.centerx - content_w / 2
+        icon_center = (content_x + TAB_ICON_SIZE / 2, rect.centery)
+        CATEGORY_GLYPHS[cat](surface, icon_center, TAB_ICON_SIZE, text_color)
+        text_x = content_x + TAB_ICON_SIZE + TAB_ICON_GAP
+        surface.blit(text_surf, text_surf.get_rect(midleft=(text_x, rect.centery)))
     return rects
 
 
@@ -197,18 +323,21 @@ async def main():
     clock = pygame.time.Clock()
     load_images()
 
-    title_font = pygame.font.SysFont(None, 64, bold=True)
-    subtitle_font = pygame.font.SysFont(None, 26)
-    name_font = pygame.font.SysFont(None, 30, bold=True)
-    comment_font = pygame.font.SysFont(None, 20)
-    nav_font = pygame.font.SysFont(None, 22, bold=True)
-    tab_font = pygame.font.SysFont(None, 26, bold=True)
+    title_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-ExtraBold.ttf"), 54)
+    subtitle_font = pygame.font.Font(str(FONTS_DIR / "Nunito-Regular.ttf"), 20)
+    name_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 24)
+    comment_font = pygame.font.Font(str(FONTS_DIR / "Nunito-Regular.ttf"), 16)
+    nav_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 18)
+    tab_font = pygame.font.Font(str(FONTS_DIR / "Baloo2-Bold.ttf"), 19)
 
     active_category = CATEGORY_ORDER[0]
     cards = layout_cards(active_category)
     max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP))
     scroll = 0
     running = True
+
+    header_bg = make_glow_background(WIDTH, GRID_TOP)
+    grid_bg = make_glow_background(WIDTH, max(content_height(cards), HEIGHT - GRID_TOP))
 
     nav_button = pygame.Rect(24, 20, 190, 42)
 
@@ -245,6 +374,9 @@ async def main():
                                 0, content_height(cards) - (HEIGHT - GRID_TOP)
                             )
                             scroll = 0
+                            grid_bg = make_glow_background(
+                                WIDTH, max(content_height(cards), HEIGHT - GRID_TOP)
+                            )
                         break
 
                 if not clicked_tab and mouse_pos[1] >= GRID_TOP:
@@ -256,10 +388,12 @@ async def main():
                             load_images()
                             break
 
-        screen.fill(BG_COLOR)
+        screen.blit(header_bg, (0, 0))
 
         title_surf = title_font.render("Arcade", True, TITLE_COLOR)
-        screen.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, 60)))
+        title_rect = title_surf.get_rect(center=(WIDTH // 2, 60))
+        draw_title_glow(screen, title_rect, TITLE_COLOR)
+        screen.blit(title_surf, title_rect)
         subtitle_surf = subtitle_font.render(
             "Pick a game to play!", True, SUBTITLE_COLOR
         )
@@ -269,22 +403,30 @@ async def main():
 
         # ---- Scrollable card grid, clipped so it never draws over the header ----
         grid_h = max(content_height(cards), HEIGHT - GRID_TOP)
-        grid_surface = pygame.Surface((WIDTH, grid_h))
-        grid_surface.fill(BG_COLOR)
+        grid_surface = grid_bg.copy()
 
+        CARD_RADIUS = 20
         for card in cards:
             hovered = mouse_pos[1] >= GRID_TOP and card.is_hovered(mouse_grid_pos)
             color = card.game["hover"] if hovered else card.game["color"]
+            border_color = CATEGORY_COLORS[card.game["category"]]
             rect = card.rect.inflate(6, 6) if hovered else card.rect
-            pygame.draw.rect(grid_surface, color, rect, border_radius=14)
-            pygame.draw.rect(grid_surface, (60, 64, 84), rect, width=2, border_radius=14)
+
+            draw_glow_shadow(grid_surface, rect, color, CARD_RADIUS, hovered)
+            pygame.draw.rect(grid_surface, color, rect, border_radius=CARD_RADIUS)
+            draw_card_gloss(grid_surface, rect, CARD_RADIUS)
+            pygame.draw.rect(
+                grid_surface, border_color, rect, width=3 if hovered else 2, border_radius=CARD_RADIUS
+            )
 
             image = card.game["image_surface"]
             img_top = rect.top + 16
             grid_surface.blit(image, image.get_rect(midtop=(rect.centerx, img_top)))
 
+            name_color, comment_color = readable_text_color(color)
+
             name_top = img_top + IMAGE_SIZE + 10
-            name_surf = name_font.render(card.game["name"], True, TEXT_COLOR)
+            name_surf = name_font.render(card.game["name"], True, name_color)
             grid_surface.blit(
                 name_surf, name_surf.get_rect(midtop=(rect.centerx, name_top))
             )
@@ -292,7 +434,7 @@ async def main():
             comment_top = name_top + 32
             lines = card.game["comment"].split("\n")
             for i, line in enumerate(lines):
-                line_surf = comment_font.render(line, True, (200, 204, 220))
+                line_surf = comment_font.render(line, True, comment_color)
                 grid_surface.blit(
                     line_surf,
                     line_surf.get_rect(
