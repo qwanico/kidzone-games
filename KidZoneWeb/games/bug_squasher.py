@@ -2,12 +2,21 @@ import asyncio
 import math
 import random
 
+from pathlib import Path
+
 import pygame
 
 try:
     import platform
 except ImportError:
     platform = None
+
+try:
+    from .common import sfx
+except ImportError:  # standalone `python games/bug_squasher.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import sfx
 
 WIDTH, HEIGHT = 900, 700
 BG_COLOR = (225, 235, 200)
@@ -298,6 +307,7 @@ async def run():
                             bug.squashed = True
                             bug.squash_at = now
                             score += 1
+                            sfx.good()
                             streak += 1
                             spawn_squash_burst(particles, bug.x, bug.y)
                             if streak >= 3 and streak % 5 == 0:

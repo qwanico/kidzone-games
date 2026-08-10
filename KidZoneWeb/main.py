@@ -13,6 +13,8 @@ try:
 except ImportError:
     platform = None
 
+from games.common import sfx
+
 BASE_DIR = Path(__file__).parent
 ICONS_DIR = BASE_DIR / "tile_icons"
 FONTS_DIR = BASE_DIR / "fonts"
@@ -1436,7 +1438,16 @@ async def main():
         badge_rows = [
             ACHIEVEMENTS[i:i + badges_per_row] for i in range(0, len(ACHIEVEMENTS), badges_per_row)
         ]
-        badge_start_y = SET_GAMES_Y + int(clamp(46 * SCALE, 36, 56)) + badge_radius
+        # Global mute lives here so a parent has one place to silence the app.
+        SET_MUTE_Y = SET_GAMES_Y + int(clamp(34 * SCALE, 26, 40))
+        mute_btn_w = int(clamp(230 * SCALE, 180, 230))
+        mute_btn_h = int(clamp(48 * SCALE, 40, 48))
+        mute_rect_content = pygame.Rect(0, 0, mute_btn_w, mute_btn_h)
+        mute_rect_content.center = (WIDTH // 2, SET_MUTE_Y + mute_btn_h // 2)
+
+        badge_start_y = (
+            SET_MUTE_Y + mute_btn_h + int(clamp(40 * SCALE, 30, 50)) + badge_radius
+        )
         badge_positions = []
         for row_index, row in enumerate(badge_rows):
             row_w = len(row) * badge_radius * 2 + (len(row) - 1) * badge_gap_x
@@ -1605,6 +1616,13 @@ async def main():
                                 confirm_reset = False
                         elif reset_button_rect.collidepoint(event.pos):
                             confirm_reset = True
+                        elif (
+                            settings_band_rect.collidepoint(event.pos)
+                            and mute_rect_content.move(
+                                0, SETTINGS_SCROLL_TOP - settings_scroll
+                            ).collidepoint(event.pos)
+                        ):
+                            sfx.toggle_muted()
                         elif settings_band_rect.collidepoint(event.pos) and settings_max_scroll > 0:
                             # Drag-to-scroll: only starts inside the band, so it
                             # can never swallow a tap on the fixed back/footer
@@ -1836,6 +1854,18 @@ async def main():
                 games_surf = comment_font.render(games_text, True, SUBTITLE_COLOR)
                 screen.blit(
                     games_surf, games_surf.get_rect(center=(WIDTH // 2, SET_GAMES_Y + content_dy))
+                )
+
+                mute_rect = mute_rect_content.move(0, content_dy)
+                muted_now = sfx.is_muted()
+                mute_hovered = mute_rect.collidepoint(mouse_pos)
+                draw_button(
+                    screen, mute_rect,
+                    "Sound: Off" if muted_now else "Sound: On",
+                    button_font,
+                    INK_SOFT_COLOR if muted_now else TEAL_COLOR,
+                    INK_COLOR if muted_now else TEAL_DEEP_COLOR,
+                    mute_hovered,
                 )
 
                 for achievement, center in badge_positions:

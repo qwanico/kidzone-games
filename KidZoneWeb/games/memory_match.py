@@ -2,12 +2,21 @@ import asyncio
 import math
 import random
 
+from pathlib import Path
+
 import pygame
 
 try:
     import platform
 except ImportError:
     platform = None
+
+try:
+    from .common import sfx
+except ImportError:  # standalone `python games/memory_match.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import sfx
 
 WIDTH, HEIGHT = 900, 750
 BG_COLOR = (245, 240, 250)
@@ -376,6 +385,7 @@ async def run():
                                 if open_cards[0].shape == open_cards[1].shape:
                                     open_cards[0].matched = True
                                     open_cards[1].matched = True
+                                    sfx.good()
                                     open_cards[0].pop = 0.001
                                     open_cards[1].pop = 0.001
                                     spawn_confetti(

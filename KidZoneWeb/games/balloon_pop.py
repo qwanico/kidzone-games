@@ -2,12 +2,21 @@ import asyncio
 import math
 import random
 
+from pathlib import Path
+
 import pygame
 
 try:
     import platform
 except ImportError:
     platform = None
+
+try:
+    from .common import sfx
+except ImportError:  # standalone `python games/balloon_pop.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import sfx
 
 WIDTH, HEIGHT = 900, 700
 BG_TOP = (150, 200, 245)
@@ -415,6 +424,7 @@ async def run():
                             balloon.popped = True
                             if balloon.is_bomb:
                                 lives -= 1
+                                sfx.bad()
                                 streak = 0
                                 spawn_bomb_burst(particles, balloon.x, balloon.y)
                                 spawn_shockwave(shockwaves, balloon.x, balloon.y, (255, 140, 60))
@@ -426,6 +436,7 @@ async def run():
                                 flash_color = (255, 140, 60)
                             else:
                                 score += 1
+                                sfx.good()
                                 streak += 1
                                 spawn_pop_confetti(particles, balloon.x, balloon.y, balloon.color)
                                 spawn_shockwave(shockwaves, balloon.x, balloon.y, balloon.color)

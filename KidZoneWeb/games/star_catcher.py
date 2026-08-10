@@ -2,12 +2,21 @@ import asyncio
 import math
 import random
 
+from pathlib import Path
+
 import pygame
 
 try:
     import platform
 except ImportError:
     platform = None
+
+try:
+    from .common import sfx
+except ImportError:  # standalone `python games/star_catcher.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import sfx
 
 WIDTH, HEIGHT = 900, 700
 BG_TOP = (25, 25, 60)
@@ -397,6 +406,7 @@ async def run():
                     basket_squash = 1.0
                     if item.is_rock:
                         lives -= 1
+                        sfx.bad()
                         catch_streak = 0
                         spawn_dust(particles, item.x, item.y)
                         spawn_shockwave(shockwaves, item.x, item.y, (140, 140, 150))
@@ -406,6 +416,7 @@ async def run():
                         flash_life = 0.13
                     else:
                         score += 1
+                        sfx.good()
                         catch_streak += 1
                         spawn_sparkles(particles, item.x, item.y)
                         spawn_shockwave(shockwaves, item.x, item.y, STAR_COLOR)

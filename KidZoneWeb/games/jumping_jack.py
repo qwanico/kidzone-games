@@ -2,12 +2,21 @@ import asyncio
 import math
 import random
 
+from pathlib import Path
+
 import pygame
 
 try:
     import platform
 except ImportError:
     platform = None
+
+try:
+    from .common import sfx
+except ImportError:  # standalone `python games/jumping_jack.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import sfx
 
 WIDTH, HEIGHT = 900, 600
 BG_TOP = (255, 200, 150)
@@ -375,6 +384,7 @@ async def run():
             for obstacle in obstacles:
                 if player_rect.colliderect(obstacle.rect()):
                     game_over = True
+                    sfx.bad()
                     if score > best_score:
                         best_score = score
                         new_best = True

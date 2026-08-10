@@ -2,12 +2,21 @@ import asyncio
 import math
 import random
 
+from pathlib import Path
+
 import pygame
 
 try:
     import platform
 except ImportError:
     platform = None
+
+try:
+    from .common import sfx
+except ImportError:  # standalone `python games/whack_a_mole.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import sfx
 
 WIDTH, HEIGHT = 900, 700
 BG_COLOR = (140, 200, 110)
@@ -333,6 +342,7 @@ async def run():
                             break
                     if hit_hole is not None:
                         score += 1
+                        sfx.good()
                         streak += 1
                         spawn_whack_burst(particles, hit_hole.center[0], hit_hole.center[1] - 40)
                         if streak >= 3 and streak % 3 == 0:

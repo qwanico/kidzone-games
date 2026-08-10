@@ -2,12 +2,21 @@ import asyncio
 import math
 import random
 
+from pathlib import Path
+
 import pygame
 
 try:
     import platform
 except ImportError:
     platform = None
+
+try:
+    from .common import sfx
+except ImportError:  # standalone `python games/fish_catch.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import sfx
 
 WIDTH, HEIGHT = 900, 700
 BG_TOP = (30, 90, 165)
@@ -389,6 +398,7 @@ async def run():
                             fish.caught = True
                             if fish.is_junk:
                                 lives -= 1
+                                sfx.bad()
                                 streak = 0
                                 spawn_murk_burst(particles, fish.x, fish.y)
                                 spawn_shockwave(shockwaves, fish.x, fish.y, (90, 70, 50))
@@ -398,6 +408,7 @@ async def run():
                                 flash_life = 130.0
                             else:
                                 score += 1
+                                sfx.good()
                                 streak += 1
                                 spawn_catch_burst(particles, fish.x, fish.y)
                                 spawn_shockwave(shockwaves, fish.x, fish.y, fish.color)
