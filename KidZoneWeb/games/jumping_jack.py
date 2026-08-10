@@ -22,6 +22,20 @@ TITLE_COLOR = (60, 60, 90)
 PLAYER_X = 150
 PLAYER_W, PLAYER_H = 50, 70
 GRAVITY = 0.9
+
+
+def frame_step(dt_ms):
+    """Convert a frame's elapsed ms into '60fps frames worth of movement'.
+
+    All the tuning constants in this game (gravity, scroll speed, particle
+    drift) were authored as per-frame amounts at 60fps. Multiplying them by
+    this keeps that tuning intact while making the result refresh-rate
+    independent. Clamped to 3 frames so a long stall doesn't tunnel the
+    player through an obstacle.
+    """
+    if not dt_ms:
+        return 1.0
+    return min(3.0, dt_ms / (1000.0 / 60.0))
 JUMP_VELOCITY = -16
 
 OBSTACLE_W, OBSTACLE_H = 40, 60
@@ -103,8 +117,14 @@ class Player:
             self.squash = -0.35
 
     def update(self, dt):
-        self.vy += GRAVITY
-        self.y += self.vy
+        # Gravity used to be applied once per frame regardless of refresh rate,
+        # so the whole game ran at double speed on a 120Hz tablet and half
+        # speed on a struggling one. step == 1.0 at 60fps, and is clamped so a
+        # backgrounded tab resuming with a huge dt can't teleport the player
+        # straight through an obstacle.
+        step = frame_step(dt)
+        self.vy += GRAVITY * step
+        self.y += self.vy * step
         landed = False
         if self.y >= GROUND_Y - PLAYER_H:
             if not self.on_ground:
@@ -245,11 +265,12 @@ def spawn_crash(particles, x, y):
 
 
 def update_particles(particles, dt_ms):
+    step = frame_step(dt_ms)
     for p in particles:
         p["age"] += dt_ms
-        p["x"] += p["vx"]
-        p["y"] += p["vy"]
-        p["vy"] += 0.12
+        p["x"] += p["vx"] * step
+        p["y"] += p["vy"] * step
+        p["vy"] += 0.12 * step
     particles[:] = [p for p in particles if p["age"] < p["life"]]
 
 
@@ -347,7 +368,7 @@ async def run():
                 next_spawn_at = now + random.randint(SPAWN_MIN_MS, SPAWN_MAX_MS)
 
             for obstacle in obstacles:
-                obstacle.update(speed)
+                obstacle.update(speed * frame_step(dt))
             obstacles = [o for o in obstacles if not o.off_screen()]
 
             player_rect = player.rect().inflate(-14, -6)

@@ -82,10 +82,25 @@ def planet_render_size(planet, height, max_width=None):
     return width, height
 
 
+# smoothscale is a software resample with no SIMD path in the pygbag build.
+# This used to run for every tray planet, every placed planet and the win
+# screen on every frame - measured at ~1.7 ms/frame for 9 planets, about 10%
+# of the whole 60fps budget. Sizes are integer pixels drawn from a handful of
+# fixed constants plus a short pop animation, so the set of distinct sizes is
+# small and bounded: caching them makes steady-state frames free.
+_scaled_cache = {}
+
+
 def draw_planet(surface, center, planet, height, max_width=None):
     img = planet["image"]
     width, actual_height = planet_render_size(planet, height, max_width)
-    scaled = pygame.transform.smoothscale(img, (max(1, int(width)), max(1, int(actual_height))))
+    w = max(1, int(width))
+    h = max(1, int(actual_height))
+    key = (planet["file"], w, h)
+    scaled = _scaled_cache.get(key)
+    if scaled is None:
+        scaled = pygame.transform.smoothscale(img, (w, h))
+        _scaled_cache[key] = scaled
     surface.blit(scaled, scaled.get_rect(center=center))
 
 

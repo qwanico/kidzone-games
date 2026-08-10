@@ -729,6 +729,7 @@ def make_background(width, height, y_offset=0, total_height=None):
 
 _shadow_cache = {}
 _gloss_cache = {}
+_featured_icon_cache = {}
 
 
 def draw_soft_shadow(surface, rect, radius, offset_y=8, pad=6, alpha=70):
@@ -900,7 +901,13 @@ def draw_featured_card(surface, rect, game, fonts, play_hovered):
     pad = int(clamp(18 * SCALE, 12, 18))
 
     icon_size = int(rect.height * 0.6)
-    icon = pygame.transform.smoothscale(game["image_surface"], (icon_size, icon_size))
+    # icon_size is constant for a given layout, but this runs every frame of
+    # the hub - cache the resample instead of repeating it 60x a second.
+    icon_key = (game["key"], icon_size)
+    icon = _featured_icon_cache.get(icon_key)
+    if icon is None:
+        icon = pygame.transform.smoothscale(game["image_surface"], (icon_size, icon_size))
+        _featured_icon_cache[icon_key] = icon
     plate_rect = pygame.Rect(0, 0, icon_size + pad, icon_size + pad)
     plate_rect.midleft = (rect.x + pad, rect.centery)
     pygame.draw.rect(surface, PAPER_COLOR, plate_rect, border_radius=int(CARD_RADIUS * 0.7))
