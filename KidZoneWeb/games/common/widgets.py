@@ -97,5 +97,11 @@ class AnswerButton:
         color = self.color_for(mouse_pos)
         pygame.draw.rect(surface, color, self.rect, border_radius=self.radius)
         pygame.draw.rect(surface, WHITE, self.rect, width=3, border_radius=self.radius)
+        self.draw_face(surface, font, mouse_pos)
+
+    def draw_face(self, surface, font, mouse_pos):
+        """What sits inside the button. Subclasses that answer with a picture
+        rather than a word - a shape, a cluster of dots - override just this
+        and keep the shared frame and its correct/wrong states."""
         text_surf = font.render(self.label, True, WHITE)
         surface.blit(text_surf, text_surf.get_rect(center=self.rect.center))
