@@ -439,7 +439,13 @@ def play_correct_sound():
 # playing underneath the spoken prompts instead of being interrupted.
 
 background_music = pygame.mixer.Sound(str(SOUNDS_DIR / "background_music.ogg"))
-music_channel = background_music.play(loops=-1)
+
+# Deliberately NOT started here. Starting the loop at module-import time
+# left an orphaned channel looping forever: run() starts its own channel
+# and only that one gets stopped on exit, so the import-time channel kept
+# playing underneath (two overlapping copies in-game, and music still
+# looping back on the hub after quitting). run() owns this channel now.
+music_channel = None
 
 
 
@@ -492,7 +498,8 @@ def update_music_fade(dt):
     elif music_volume_current > target:
         music_volume_current = max(target, music_volume_current - MUSIC_FADE_RATE * dt)
 
-    music_channel.set_volume(music_volume_current)
+    if music_channel is not None:
+        music_channel.set_volume(music_volume_current)
 
 
 apply_volumes()
@@ -2247,7 +2254,9 @@ async def run():
 
         await asyncio.sleep(0)
 
-    music_channel.stop()
+    if music_channel is not None:
+        music_channel.stop()
+    voice_channel.stop()
 
 
 if __name__ == "__main__":

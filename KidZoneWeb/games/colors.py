@@ -547,6 +547,8 @@ class Game:
             clock.tick(60)
             await asyncio.sleep(0)
 
+        self.voice_channel.stop()
+
 
 if __name__ == "__main__":
     asyncio.run(Game().run())
