@@ -1,0 +1,15 @@
+# Dev environment for KidZoneWeb.
+#
+# pygame-ce is pinned to the exact version pygbag ships into the browser.
+# Developing against classic pygame while production ran pygame-ce was a
+# standing source of "worked locally, broke in the browser" bugs, and a
+# floating pygame-ce would reintroduce the same mismatch in the other
+# direction, so this tracks the runtime rather than the latest release.
+#
+#   python -m venv pygbag_env
+#   pygbag_env/bin/pip install -r KidZoneWeb/requirements-dev.txt
+#
+# Check what pygbag actually ships before bumping either pin:
+#   pygbag_env/bin/python -m pygbag --version
+pygame-ce==2.5.7
+pygbag==0.9.3
