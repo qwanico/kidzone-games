@@ -48,6 +48,18 @@ def exercise(module_name):
     check(results, "a round is dealt",
           game.current is not None and len(game.buttons) >= 2)
 
+    # Drawing is where the migration actually moved code - custom button
+    # faces, the card, both draw_prompt branches. None of it raises until
+    # something renders it, so every state gets drawn at least once below.
+    def drew(label):
+        try:
+            game.draw()
+            check(results, label, True)
+        except Exception as exc:
+            check(results, f"{label} ({type(exc).__name__}: {exc})", False)
+
+    drew("draws the open question")
+
     def tap(correct):
         for button, value in zip(game.buttons, game.button_values):
             if (value == game.correct_value()) is correct:
@@ -64,6 +76,8 @@ def exercise(module_name):
           game.feedback_until > pygame.time.get_ticks())
     check(results, "correct button is flagged",
           any(b.state == "correct" for b in game.buttons))
+
+    drew("draws the revealed answer and feedback")
 
     scored = game.score
     tap(correct=True)
@@ -85,6 +99,7 @@ def exercise(module_name):
         tap(correct=True)
     check(results, "milestone fires at a streak of 3",
           game.milestone_text == "3 in a row!")
+    drew("draws the milestone banner")
 
     # Pausing mid-feedback must bank the remaining time, or resuming would
     # skip straight past the answer the child is still looking at.
@@ -92,6 +107,7 @@ def exercise(module_name):
     check(results, "pause enters the paused state", game.state == "paused")
     check(results, "remaining feedback time is banked",
           game._pause_remaining is not None)
+    drew("draws the pause overlay")
     game.resume_game()
     check(results, "resume returns to play", game.state == "playing")
 
