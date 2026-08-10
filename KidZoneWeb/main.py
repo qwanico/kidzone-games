@@ -114,12 +114,12 @@ def apply_responsive_layout(width, height):
     usable_w = WIDTH - CARD_MARGIN * 2
     CARD_W = int((usable_w - CARD_GAP * (COLS - 1)) / COLS)
     CARD_W = clamp(CARD_W, 140, 300)
-    # 1.05, not the visually-tighter 0.95 the original fixed-size design
-    # used - real rendered text (name + 2-line comment) needs more room
-    # underneath the icon than that ratio leaves, at every screen size,
-    # which was cutting the second comment line off against the card's
-    # own bottom edge.
-    CARD_H = int(CARD_W * 1.1)
+    # A floor, not the final height: 1.15 (rather than the visually-tighter
+    # 0.95 the original fixed-size design used) covers the common case, and
+    # main() grows CARD_H further once it has measured the real wrapped
+    # caption against the real font. Sizing off the ratio alone was cutting
+    # the last caption line off against the card's own bottom edge.
+    CARD_H = int(CARD_W * 1.15)
     CARD_RADIUS = clamp(int(30 * SCALE), 18, 30)
     IMAGE_SIZE = clamp(int(CARD_W * 0.4), 56, 120)
 
@@ -595,6 +595,25 @@ CATEGORY_COLORS = {
     "Puzzles": GRAPE_COLOR,
     "Active": CORAL_COLOR,
 }
+
+
+def wrap_lines(text, font, max_w):
+    """Greedy word wrap. Card captions were authored with a hand-placed
+    newline that assumed a wide card; on a phone that fixed split either
+    overflowed sideways or forced the font down to an unreadable size.
+    Wrapping to the real card width lets the font stay legible instead."""
+    words = text.replace("\n", " ").split()
+    lines, current = [], ""
+    for word in words:
+        trial = f"{current} {word}".strip()
+        if current and font.size(trial)[0] > max_w:
+            lines.append(current)
+            current = word
+        else:
+            current = trial
+    if current:
+        lines.append(current)
+    return lines
 
 
 def layout_cards(active_category):
@@ -1172,6 +1191,7 @@ async def main():
         # ---- Responsive sizing: use the real browser viewport instead of a
         # fixed 1000x700 canvas, so phones get a taller/narrower layout with
         # fewer columns instead of a huge letterboxed black margin. ----
+        global CARD_H
         apply_responsive_layout(*built_viewport)
 
         screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
@@ -1190,19 +1210,38 @@ async def main():
         subtitle_size = int(clamp(22 * SCALE, 16, 23))
         stat_pill_size = int(clamp(18 * SCALE, 15, 18))
         name_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29)))
-        comment_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", int(clamp(18 * SCALE, 14, 18)))
+        # Captions keep a readable size and wrap to the card width instead
+        # of being shrunk to fit one hand-authored line break.
+        comment_font = pygame.font.Font(
+            FONTS_DIR / "Nunito-Regular.ttf", int(clamp(18 * SCALE, 15, 18))
+        )
+        _cap_pad = int(clamp(20 * SCALE, 14, 20))
+        WRAPPED_CAPTIONS = {
+            g["key"]: wrap_lines(g["comment"], comment_font, CARD_W - _cap_pad)
+            for g in GAMES
+        }
+        # Grow the card if wrapping produced more lines than the ratio allows.
+        _line_step = comment_font.get_height() + 2
+        _need = (
+            int(clamp(18 * SCALE, 12, 18)) + IMAGE_SIZE + int(clamp(12 * SCALE, 8, 12))
+            + name_font.get_height() + int(clamp(8 * SCALE, 5, 8))
+            + max(len(v) for v in WRAPPED_CAPTIONS.values()) * _line_step
+            + int(clamp(14 * SCALE, 10, 14))
+        )
+        if _need > CARD_H:
+            CARD_H = _need
         gate_title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", 40)
         settings_title_font = pygame.font.Font(
             FONTS_DIR / "Baloo2-ExtraBold.ttf", int(clamp(40 * SCALE, 28, 40))
         )
-        stat_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(22 * SCALE, 16, 22)))
-        badge_label_font = pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 12, 15)))
+        stat_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(22 * SCALE, 17, 22)))
+        badge_label_font = pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 14, 16)))
         button_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", 22)
 
         title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", title_size)
         subtitle_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", subtitle_size)
         stat_pill_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", stat_pill_size)
-        tab_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(24 * SCALE, 17, 25)))
+        tab_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(24 * SCALE, 18, 25)))
 
         cards = layout_cards(active_category)
         max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP)
@@ -1239,7 +1278,7 @@ async def main():
                 await asyncio.sleep(0.014)
 
         # --- Fixed layout for the header row (mascot/title, stat pills, nav) ---
-        gear_radius = int(clamp(22 * SCALE, 18, 22))
+        gear_radius = int(clamp(24 * SCALE, 22, 26))
         gear_center = (WIDTH - CARD_MARGIN - gear_radius, HEADER_Y)
         gear_rect = pygame.Rect(0, 0, gear_radius * 2, gear_radius * 2)
         gear_rect.center = gear_center
@@ -1660,7 +1699,7 @@ async def main():
 
                     comment_top = name_top + name_surf.get_height() + int(clamp(8 * SCALE, 5, 8))
                     line_step = comment_font.get_height() + 2
-                    lines = card.game["comment"].split("\n")
+                    lines = WRAPPED_CAPTIONS[card.game["key"]]
                     for i, line in enumerate(lines):
                         line_surf = comment_font.render(line, True, (255, 255, 255))
                         grid_surface.blit(
