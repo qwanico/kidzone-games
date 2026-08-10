@@ -1167,649 +1167,689 @@ STATE_SETTINGS = "settings"
 async def main():
     pygame.init()
 
-    # ---- Responsive sizing: use the real browser viewport instead of a
-    # fixed 1000x700 canvas, so phones get a taller/narrower layout with
-    # fewer columns instead of a huge letterboxed black margin. ----
-    apply_responsive_layout(*get_viewport_size())
-
-    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
-    resize_window()
-    pygame.display.set_caption("Kid Zone")
-    clock = pygame.time.Clock()
-    load_images()
-
-    title_size = int(clamp(58 * SCALE, 36, 60))
-    subtitle_size = int(clamp(22 * SCALE, 16, 23))
-    stat_pill_size = int(clamp(18 * SCALE, 15, 18))
-    name_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29)))
-    comment_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", int(clamp(18 * SCALE, 14, 18)))
-    gate_title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", 40)
-    settings_title_font = pygame.font.Font(
-        FONTS_DIR / "Baloo2-ExtraBold.ttf", int(clamp(40 * SCALE, 28, 40))
-    )
-    stat_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(22 * SCALE, 16, 22)))
-    badge_label_font = pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 12, 15)))
-    button_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", 22)
-
-    title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", title_size)
-    subtitle_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", subtitle_size)
-    stat_pill_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", stat_pill_size)
-    tab_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(24 * SCALE, 17, 25)))
-    featured_fonts = {
-        "featured_eyebrow": pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 12, 15))),
-        "featured_title": pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29))),
-        "featured_desc": pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", int(clamp(17 * SCALE, 13, 17))),
-        "featured_btn": pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(19 * SCALE, 15, 19))),
-    }
-
-    active_category = CATEGORY_ORDER[0]
-    cards = layout_cards(active_category)
-    max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP))
-    scroll = 0
-    running = True
-
-    # Today's Adventure: an existing game (Find The Food), not an invented
-    # placeholder - keeps a single, obvious starting point for a child.
-    featured_game = next((g for g in GAMES if g["key"] == "fruit_finder"), GAMES[0])
-
-    header_bg = make_background(WIDTH, GRID_TOP, y_offset=0, total_height=HEIGHT)
-    grid_bg = make_background(
-        WIDTH, max(content_height(cards), HEIGHT - GRID_TOP),
-        y_offset=GRID_TOP, total_height=HEIGHT,
-    )
-    settings_bg = make_background(WIDTH, HEIGHT)
-
-    # Real persistence: load saved progress, then run the once-per-startup
-    # daily streak check (see apply_daily_streak's docstring) before the
-    # menu loop even starts.
+    # Persistent state, deliberately kept outside the rebuild loop below.
+    # A viewport change (phone rotated, browser resized) rebuilds the whole
+    # layout, and none of this may be reset or re-run when that happens -
+    # re-running apply_daily_streak in particular would re-evaluate the
+    # daily streak on every rotation.
     progress = load_progress()
     apply_daily_streak(progress)
 
     state = STATE_MENU
-
+    active_category = CATEGORY_ORDER[0]
     gate_question = make_gate_question()
     gate_message = ""
     gate_message_until = 0
     confirm_reset = False
-
-    DRAG_CLICK_THRESHOLD = 12
-    dragging = False
-    drag_start_y = 0
-    drag_scroll_start = 0
-    drag_moved = 0
-
-    # Brief squash-and-recover press feedback before a card/featured/play
-    # launch actually hands off to the game - purely visual, drawn as a
-    # few extra frames on top of the current screen rather than requiring
-    # a rewrite of the whole per-frame drawing pipeline.
-    async def press_feedback(rect, color):
-        for step in range(6):
-            shrink = int(clamp(8 * SCALE, 4, 8) * math.sin(step / 5 * math.pi))
-            r = rect.inflate(-shrink, -shrink)
-            pygame.draw.rect(screen, color, r, border_radius=CARD_RADIUS)
-            pygame.display.flip()
-            await asyncio.sleep(0.014)
-
-    # --- Fixed layout for the header row (mascot/title, stat pills, nav) ---
-    gear_radius = int(clamp(22 * SCALE, 18, 22))
-    gear_center = (WIDTH - CARD_MARGIN - gear_radius, HEADER_Y)
-    gear_rect = pygame.Rect(0, 0, gear_radius * 2, gear_radius * 2)
-    gear_rect.center = gear_center
-
-    nav_center = (CARD_MARGIN + gear_radius, HEADER_Y)
-    nav_rect = pygame.Rect(0, 0, gear_radius * 2, gear_radius * 2)
-    nav_rect.center = nav_center
-
-    featured_rect = pygame.Rect(CARD_MARGIN, FEATURED_TOP, WIDTH - CARD_MARGIN * 2, FEATURED_H)
-
-    # Shrink the "Kid Zone" title/mascot group to fit if needed, so it can
-    # never collide with the gear icon + streak pill cluster on the right
-    # (or the arcade-nav icon on the left) on a narrow phone width - a
-    # fixed font size that was fine at 1000px wide isn't guaranteed to be
-    # safe at 380px wide.
-    mascot_size = int(clamp(104 * SCALE, 68, 104))
-    title_gap = int(clamp(18 * SCALE, 10, 18))
-    side_reserve = gear_radius * 2 + CARD_MARGIN + 96
-    available_center_w = max(150, WIDTH - side_reserve * 2)
-    for candidate_size in range(title_size, 21, -2):
-        candidate_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", candidate_size)
-        candidate_w = candidate_font.size("Kid Zone")[0]
-        if mascot_size + title_gap + candidate_w <= available_center_w or candidate_size <= 22:
-            title_font = candidate_font
-            break
-
-    GATE_BTN_W = int(clamp(150 * SCALE, 110, 150))
-    GATE_BTN_H = int(clamp(64 * SCALE, 52, 64))
-    gate_gap = int(clamp(30 * SCALE, 16, 30))
-    gate_total_w = GATE_BTN_W * 3 + gate_gap * 2
-    gate_max_w = WIDTH - 24
-    if gate_total_w > gate_max_w:
-        # 3 buttons at their own width floor can be a few px wider than the
-        # narrowest legal WIDTH (360) - shrink to guarantee they always fit
-        # on-screen instead of overflowing both edges.
-        GATE_BTN_W = max(80, (gate_max_w - gate_gap * 2) // 3)
-        gate_total_w = GATE_BTN_W * 3 + gate_gap * 2
-    gate_start_x = WIDTH // 2 - gate_total_w // 2
-
-    # Gate screen's title/question/hint/buttons/message are stacked from a
-    # single starting offset so the text block above the buttons can never
-    # collide with them, regardless of HEIGHT (fixed pixel offsets here
-    # once caused the hint text to overlap the buttons on tall/narrow
-    # phone viewports, since the buttons used to be placed at a HEIGHT
-    # fraction independent of the text stack above them).
-    GATE_TITLE_Y = int(clamp(HEIGHT * 0.12, 70, 130))
-    GATE_Q_Y = GATE_TITLE_Y + int(clamp(58 * SCALE, 48, 70))
-    GATE_HINT_Y = GATE_Q_Y + int(clamp(38 * SCALE, 32, 45))
-    GATE_BTN_Y = GATE_HINT_Y + int(clamp(38 * SCALE, 32, 48))
-    GATE_MSG_Y = GATE_BTN_Y + GATE_BTN_H + int(clamp(40 * SCALE, 30, 50))
-    GATE_BACK_Y = max(GATE_MSG_Y + int(clamp(50 * SCALE, 40, 60)), int(HEIGHT * 0.71))
-
-    gate_choice_rects = [
-        pygame.Rect(
-            gate_start_x + i * (GATE_BTN_W + gate_gap), GATE_BTN_Y, GATE_BTN_W, GATE_BTN_H
-        )
-        for i in range(3)
-    ]
-    gate_back_rect = pygame.Rect(0, 0, 220, 52)
-    gate_back_rect.center = (WIDTH // 2, GATE_BACK_Y)
-
-    settings_back_rect = pygame.Rect(
-        0, 0, int(clamp(130 * SCALE, 100, 130)), int(clamp(50 * SCALE, 40, 50))
-    )
-    settings_back_rect.topleft = (CARD_MARGIN, CARD_MARGIN)
-
-    # The "Parent Settings" title is normally dead-centered, but on a narrow
-    # phone width a true center overlaps the back button in the top-left -
-    # shift it right just enough to clear the button instead, only when
-    # that overlap would actually happen (desktop/tablet stay dead-centered).
-    settings_title_gap = int(clamp(20 * SCALE, 14, 20))
-    settings_title_min_left = settings_back_rect.right + settings_title_gap
-    settings_title_w = settings_title_font.size("Parent Settings")[0]
-    if WIDTH // 2 - settings_title_w // 2 < settings_title_min_left:
-        SETTINGS_TITLE_X = settings_title_min_left + settings_title_w // 2
-    else:
-        SETTINGS_TITLE_X = WIDTH // 2
-    # Footer action buttons stay pinned to the bottom of the screen; only
-    # the stats/badges band between the title and these scrolls.
-    footer_btn_h = int(clamp(56 * SCALE, 46, 56))
-    footer_btn_cy = HEIGHT - int(clamp(88 * SCALE, 70, 88))
-    reset_button_rect = pygame.Rect(0, 0, int(clamp(260 * SCALE, 200, 260)), footer_btn_h)
-    reset_button_rect.center = (WIDTH // 2, footer_btn_cy)
-    confirm_btn_w = int(clamp(160 * SCALE, 120, 160))
-    confirm_btn_gap = int(clamp(32 * SCALE, 16, 32))
-    confirm_offset = (confirm_btn_w + confirm_btn_gap) // 2
-    confirm_yes_rect = pygame.Rect(0, 0, confirm_btn_w, footer_btn_h)
-    confirm_no_rect = pygame.Rect(0, 0, confirm_btn_w, footer_btn_h)
-    confirm_yes_rect.center = (WIDTH // 2 - confirm_offset, footer_btn_cy)
-    confirm_no_rect.center = (WIDTH // 2 + confirm_offset, footer_btn_cy)
-
-    SETTINGS_TITLE_Y = int(clamp(HEIGHT * 0.09, 45, 70))
-    CONFIRM_MSG_OFFSET = int(clamp(30 * SCALE, 24, 34))
-
-    # The scrollable band sits between the fixed title and the fixed footer.
-    # Reserving room for the confirm-reset question above the buttons keeps
-    # that message from ever landing on top of the scrolling content.
-    SETTINGS_SCROLL_TOP = SETTINGS_TITLE_Y + int(clamp(34 * SCALE, 26, 40))
-    SETTINGS_SCROLL_BOTTOM = (
-        footer_btn_cy - footer_btn_h // 2 - CONFIRM_MSG_OFFSET - int(clamp(18 * SCALE, 14, 20))
-    )
-    SETTINGS_BAND_H = max(80, SETTINGS_SCROLL_BOTTOM - SETTINGS_SCROLL_TOP)
-    settings_band_rect = pygame.Rect(0, SETTINGS_SCROLL_TOP, WIDTH, SETTINGS_BAND_H)
-
-    # Everything below is in *content space*: y=0 is the top of the scroll
-    # band, so drawing just subtracts the current scroll offset. Stacked as
-    # one sequence (same pattern as the gate screen) rather than independent
-    # fixed pixels, and the stats line wraps to two rows on narrow widths
-    # instead of overflowing off both edges.
-    # SET_* prefix deliberately: these are settings-screen content-space
-    # offsets and must not shadow the global header STATS_Y that the hub's
-    # progress pills are positioned from.
-    STATS_LINE_GAP = int(clamp(28 * SCALE, 22, 30))
-    SET_STATS_Y = int(clamp(14 * SCALE, 10, 16))
-    if IS_NARROW:
-        SET_STATS_Y2 = SET_STATS_Y + STATS_LINE_GAP
-        SET_GAMES_Y = SET_STATS_Y2 + STATS_LINE_GAP
-    else:
-        SET_STATS_Y2 = None
-        SET_GAMES_Y = SET_STATS_Y + STATS_LINE_GAP
-
-    badges_per_row = 2 if IS_NARROW else 4
-    badge_radius = int(clamp(45 * SCALE, 28, 45))
-    badge_gap_x = int(clamp(40 * SCALE, 18, 40))
-    badge_row_gap = int(clamp(66 * SCALE, 46, 66))
-    badge_rows = [
-        ACHIEVEMENTS[i:i + badges_per_row] for i in range(0, len(ACHIEVEMENTS), badges_per_row)
-    ]
-    badge_start_y = SET_GAMES_Y + int(clamp(46 * SCALE, 36, 56)) + badge_radius
-    badge_positions = []
-    for row_index, row in enumerate(badge_rows):
-        row_w = len(row) * badge_radius * 2 + (len(row) - 1) * badge_gap_x
-        row_start_x = WIDTH // 2 - row_w // 2 + badge_radius
-        row_y = badge_start_y + row_index * (badge_radius * 2 + badge_row_gap)
-        for i, achievement in enumerate(row):
-            cx = row_start_x + i * (badge_radius * 2 + badge_gap_x)
-            badge_positions.append((achievement, (cx, row_y)))
-
-    badge_label_h = badge_label_font.get_height()
-    settings_content_h = (
-        badge_start_y
-        + (len(badge_rows) - 1) * (badge_radius * 2 + badge_row_gap)
-        + badge_radius + 8 + badge_label_h
-        + int(clamp(16 * SCALE, 12, 20))
-    )
-    settings_max_scroll = max(0, settings_content_h - SETTINGS_BAND_H)
-    settings_scroll = 0
-    settings_dragging = False
-    settings_drag_start_y = 0
-    settings_drag_scroll_start = 0
+    running = True
+    last_viewport_check = 0
 
     while running:
-        mouse_pos = pygame.mouse.get_pos()
-        # Grid-local mouse position for card hit-testing - the header/tab bar
-        # are fixed on screen now, only the grid below GRID_TOP scrolls.
-        mouse_grid_pos = (mouse_pos[0], mouse_pos[1] - GRID_TOP + scroll)
-        ticks = pygame.time.get_ticks()
-        tab_rects = category_tab_rects()
+        # Everything inside is derived from the viewport captured here, so a
+        # resize just falls out of this loop and rebuilds fonts, rects and
+        # backgrounds for the new size instead of leaving the hub laid out
+        # for the old one.
+        built_viewport = get_viewport_size()
+        needs_rebuild = False
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
 
-            elif state == STATE_MENU:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
-                    scroll = min(scroll + SCROLL_SPEED, max_scroll)
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
-                    scroll = max(scroll - SCROLL_SPEED, 0)
-                elif event.type == pygame.MOUSEWHEEL:
-                    scroll = max(0, min(scroll - event.y * SCROLL_SPEED, max_scroll))
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if gear_rect.collidepoint(event.pos):
-                        gate_question = make_gate_question()
-                        gate_message = ""
-                        state = STATE_GATE
-                    elif nav_rect.collidepoint(event.pos):
-                        go_to_arcade()
-                    elif featured_rect.collidepoint(event.pos):
-                        await press_feedback(featured_rect, featured_game["hover"])
-                        record_game_launch(progress, featured_game["name"])
-                        await launch_game(featured_game)
-                        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
-                        resize_window()
-                        pygame.display.set_caption("Kid Zone")
-                        load_images()
-                    else:
-                        clicked_tab = False
-                        for cat, rect in zip(CATEGORY_ORDER, tab_rects):
-                            if rect.collidepoint(event.pos):
-                                clicked_tab = True
-                                if cat != active_category:
-                                    active_category = cat
-                                    cards = layout_cards(active_category)
-                                    max_scroll = max(
-                                        0, content_height(cards) - (HEIGHT - GRID_TOP)
-                                    )
-                                    scroll = 0
-                                    grid_bg = make_background(
-                                        WIDTH, max(content_height(cards), HEIGHT - GRID_TOP),
-                                        y_offset=GRID_TOP, total_height=HEIGHT,
-                                    )
-                                break
+        # ---- Responsive sizing: use the real browser viewport instead of a
+        # fixed 1000x700 canvas, so phones get a taller/narrower layout with
+        # fewer columns instead of a huge letterboxed black margin. ----
+        apply_responsive_layout(*built_viewport)
 
-                        if not clicked_tab and event.pos[1] >= GRID_TOP:
-                            dragging = True
-                            drag_start_y = event.pos[1]
-                            drag_scroll_start = scroll
-                            drag_moved = 0
-                elif event.type == pygame.MOUSEMOTION and dragging:
-                    dy = event.pos[1] - drag_start_y
-                    drag_moved = max(drag_moved, abs(dy))
-                    scroll = max(0, min(drag_scroll_start - dy, max_scroll))
-                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                    if dragging and drag_moved < DRAG_CLICK_THRESHOLD:
-                        tap_pos = (event.pos[0], event.pos[1] - GRID_TOP + scroll)
-                        for card in cards:
-                            if card.is_hovered(tap_pos):
-                                press_rect = card.rect.move(0, GRID_TOP - scroll)
-                                await press_feedback(press_rect, card.game["hover"])
-                                record_game_launch(progress, card.game["name"])
-                                await launch_game(card.game)
-                                screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+        resize_window()
+        pygame.display.set_caption("Kid Zone")
+        clock = pygame.time.Clock()
+        load_images()
+
+        title_size = int(clamp(58 * SCALE, 36, 60))
+        subtitle_size = int(clamp(22 * SCALE, 16, 23))
+        stat_pill_size = int(clamp(18 * SCALE, 15, 18))
+        name_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29)))
+        comment_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", int(clamp(18 * SCALE, 14, 18)))
+        gate_title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", 40)
+        settings_title_font = pygame.font.Font(
+            FONTS_DIR / "Baloo2-ExtraBold.ttf", int(clamp(40 * SCALE, 28, 40))
+        )
+        stat_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(22 * SCALE, 16, 22)))
+        badge_label_font = pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 12, 15)))
+        button_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", 22)
+
+        title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", title_size)
+        subtitle_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", subtitle_size)
+        stat_pill_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", stat_pill_size)
+        tab_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(24 * SCALE, 17, 25)))
+        featured_fonts = {
+            "featured_eyebrow": pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 12, 15))),
+            "featured_title": pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29))),
+            "featured_desc": pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", int(clamp(17 * SCALE, 13, 17))),
+            "featured_btn": pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(19 * SCALE, 15, 19))),
+        }
+
+        cards = layout_cards(active_category)
+        max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP))
+        scroll = 0
+
+        # Today's Adventure: an existing game (Find The Food), not an invented
+        # placeholder - keeps a single, obvious starting point for a child.
+        featured_game = next((g for g in GAMES if g["key"] == "fruit_finder"), GAMES[0])
+
+        header_bg = make_background(WIDTH, GRID_TOP, y_offset=0, total_height=HEIGHT)
+        grid_bg = make_background(
+            WIDTH, max(content_height(cards), HEIGHT - GRID_TOP),
+            y_offset=GRID_TOP, total_height=HEIGHT,
+        )
+        settings_bg = make_background(WIDTH, HEIGHT)
+
+
+
+
+        DRAG_CLICK_THRESHOLD = 12
+        dragging = False
+        drag_start_y = 0
+        drag_scroll_start = 0
+        drag_moved = 0
+
+        # Brief squash-and-recover press feedback before a card/featured/play
+        # launch actually hands off to the game - purely visual, drawn as a
+        # few extra frames on top of the current screen rather than requiring
+        # a rewrite of the whole per-frame drawing pipeline.
+        async def press_feedback(rect, color):
+            for step in range(6):
+                shrink = int(clamp(8 * SCALE, 4, 8) * math.sin(step / 5 * math.pi))
+                r = rect.inflate(-shrink, -shrink)
+                pygame.draw.rect(screen, color, r, border_radius=CARD_RADIUS)
+                pygame.display.flip()
+                await asyncio.sleep(0.014)
+
+        # --- Fixed layout for the header row (mascot/title, stat pills, nav) ---
+        gear_radius = int(clamp(22 * SCALE, 18, 22))
+        gear_center = (WIDTH - CARD_MARGIN - gear_radius, HEADER_Y)
+        gear_rect = pygame.Rect(0, 0, gear_radius * 2, gear_radius * 2)
+        gear_rect.center = gear_center
+
+        nav_center = (CARD_MARGIN + gear_radius, HEADER_Y)
+        nav_rect = pygame.Rect(0, 0, gear_radius * 2, gear_radius * 2)
+        nav_rect.center = nav_center
+
+        featured_rect = pygame.Rect(CARD_MARGIN, FEATURED_TOP, WIDTH - CARD_MARGIN * 2, FEATURED_H)
+
+        # Shrink the "Kid Zone" title/mascot group to fit if needed, so it can
+        # never collide with the gear icon + streak pill cluster on the right
+        # (or the arcade-nav icon on the left) on a narrow phone width - a
+        # fixed font size that was fine at 1000px wide isn't guaranteed to be
+        # safe at 380px wide.
+        mascot_size = int(clamp(104 * SCALE, 68, 104))
+        title_gap = int(clamp(18 * SCALE, 10, 18))
+        side_reserve = gear_radius * 2 + CARD_MARGIN + 96
+        available_center_w = max(150, WIDTH - side_reserve * 2)
+        for candidate_size in range(title_size, 21, -2):
+            candidate_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", candidate_size)
+            candidate_w = candidate_font.size("Kid Zone")[0]
+            if mascot_size + title_gap + candidate_w <= available_center_w or candidate_size <= 22:
+                title_font = candidate_font
+                break
+
+        GATE_BTN_W = int(clamp(150 * SCALE, 110, 150))
+        GATE_BTN_H = int(clamp(64 * SCALE, 52, 64))
+        gate_gap = int(clamp(30 * SCALE, 16, 30))
+        gate_total_w = GATE_BTN_W * 3 + gate_gap * 2
+        gate_max_w = WIDTH - 24
+        if gate_total_w > gate_max_w:
+            # 3 buttons at their own width floor can be a few px wider than the
+            # narrowest legal WIDTH (360) - shrink to guarantee they always fit
+            # on-screen instead of overflowing both edges.
+            GATE_BTN_W = max(80, (gate_max_w - gate_gap * 2) // 3)
+            gate_total_w = GATE_BTN_W * 3 + gate_gap * 2
+        gate_start_x = WIDTH // 2 - gate_total_w // 2
+
+        # Gate screen's title/question/hint/buttons/message are stacked from a
+        # single starting offset so the text block above the buttons can never
+        # collide with them, regardless of HEIGHT (fixed pixel offsets here
+        # once caused the hint text to overlap the buttons on tall/narrow
+        # phone viewports, since the buttons used to be placed at a HEIGHT
+        # fraction independent of the text stack above them).
+        GATE_TITLE_Y = int(clamp(HEIGHT * 0.12, 70, 130))
+        GATE_Q_Y = GATE_TITLE_Y + int(clamp(58 * SCALE, 48, 70))
+        GATE_HINT_Y = GATE_Q_Y + int(clamp(38 * SCALE, 32, 45))
+        GATE_BTN_Y = GATE_HINT_Y + int(clamp(38 * SCALE, 32, 48))
+        GATE_MSG_Y = GATE_BTN_Y + GATE_BTN_H + int(clamp(40 * SCALE, 30, 50))
+        GATE_BACK_Y = max(GATE_MSG_Y + int(clamp(50 * SCALE, 40, 60)), int(HEIGHT * 0.71))
+
+        gate_choice_rects = [
+            pygame.Rect(
+                gate_start_x + i * (GATE_BTN_W + gate_gap), GATE_BTN_Y, GATE_BTN_W, GATE_BTN_H
+            )
+            for i in range(3)
+        ]
+        gate_back_rect = pygame.Rect(0, 0, 220, 52)
+        gate_back_rect.center = (WIDTH // 2, GATE_BACK_Y)
+
+        settings_back_rect = pygame.Rect(
+            0, 0, int(clamp(130 * SCALE, 100, 130)), int(clamp(50 * SCALE, 40, 50))
+        )
+        settings_back_rect.topleft = (CARD_MARGIN, CARD_MARGIN)
+
+        # The "Parent Settings" title is normally dead-centered, but on a narrow
+        # phone width a true center overlaps the back button in the top-left -
+        # shift it right just enough to clear the button instead, only when
+        # that overlap would actually happen (desktop/tablet stay dead-centered).
+        settings_title_gap = int(clamp(20 * SCALE, 14, 20))
+        settings_title_min_left = settings_back_rect.right + settings_title_gap
+        settings_title_w = settings_title_font.size("Parent Settings")[0]
+        if WIDTH // 2 - settings_title_w // 2 < settings_title_min_left:
+            SETTINGS_TITLE_X = settings_title_min_left + settings_title_w // 2
+        else:
+            SETTINGS_TITLE_X = WIDTH // 2
+        # Footer action buttons stay pinned to the bottom of the screen; only
+        # the stats/badges band between the title and these scrolls.
+        footer_btn_h = int(clamp(56 * SCALE, 46, 56))
+        footer_btn_cy = HEIGHT - int(clamp(88 * SCALE, 70, 88))
+        reset_button_rect = pygame.Rect(0, 0, int(clamp(260 * SCALE, 200, 260)), footer_btn_h)
+        reset_button_rect.center = (WIDTH // 2, footer_btn_cy)
+        confirm_btn_w = int(clamp(160 * SCALE, 120, 160))
+        confirm_btn_gap = int(clamp(32 * SCALE, 16, 32))
+        confirm_offset = (confirm_btn_w + confirm_btn_gap) // 2
+        confirm_yes_rect = pygame.Rect(0, 0, confirm_btn_w, footer_btn_h)
+        confirm_no_rect = pygame.Rect(0, 0, confirm_btn_w, footer_btn_h)
+        confirm_yes_rect.center = (WIDTH // 2 - confirm_offset, footer_btn_cy)
+        confirm_no_rect.center = (WIDTH // 2 + confirm_offset, footer_btn_cy)
+
+        SETTINGS_TITLE_Y = int(clamp(HEIGHT * 0.09, 45, 70))
+        CONFIRM_MSG_OFFSET = int(clamp(30 * SCALE, 24, 34))
+
+        # The scrollable band sits between the fixed title and the fixed footer.
+        # Reserving room for the confirm-reset question above the buttons keeps
+        # that message from ever landing on top of the scrolling content.
+        SETTINGS_SCROLL_TOP = SETTINGS_TITLE_Y + int(clamp(34 * SCALE, 26, 40))
+        SETTINGS_SCROLL_BOTTOM = (
+            footer_btn_cy - footer_btn_h // 2 - CONFIRM_MSG_OFFSET - int(clamp(18 * SCALE, 14, 20))
+        )
+        SETTINGS_BAND_H = max(80, SETTINGS_SCROLL_BOTTOM - SETTINGS_SCROLL_TOP)
+        settings_band_rect = pygame.Rect(0, SETTINGS_SCROLL_TOP, WIDTH, SETTINGS_BAND_H)
+
+        # Everything below is in *content space*: y=0 is the top of the scroll
+        # band, so drawing just subtracts the current scroll offset. Stacked as
+        # one sequence (same pattern as the gate screen) rather than independent
+        # fixed pixels, and the stats line wraps to two rows on narrow widths
+        # instead of overflowing off both edges.
+        # SET_* prefix deliberately: these are settings-screen content-space
+        # offsets and must not shadow the global header STATS_Y that the hub's
+        # progress pills are positioned from.
+        STATS_LINE_GAP = int(clamp(28 * SCALE, 22, 30))
+        SET_STATS_Y = int(clamp(14 * SCALE, 10, 16))
+        if IS_NARROW:
+            SET_STATS_Y2 = SET_STATS_Y + STATS_LINE_GAP
+            SET_GAMES_Y = SET_STATS_Y2 + STATS_LINE_GAP
+        else:
+            SET_STATS_Y2 = None
+            SET_GAMES_Y = SET_STATS_Y + STATS_LINE_GAP
+
+        badges_per_row = 2 if IS_NARROW else 4
+        badge_radius = int(clamp(45 * SCALE, 28, 45))
+        badge_gap_x = int(clamp(40 * SCALE, 18, 40))
+        badge_row_gap = int(clamp(66 * SCALE, 46, 66))
+        badge_rows = [
+            ACHIEVEMENTS[i:i + badges_per_row] for i in range(0, len(ACHIEVEMENTS), badges_per_row)
+        ]
+        badge_start_y = SET_GAMES_Y + int(clamp(46 * SCALE, 36, 56)) + badge_radius
+        badge_positions = []
+        for row_index, row in enumerate(badge_rows):
+            row_w = len(row) * badge_radius * 2 + (len(row) - 1) * badge_gap_x
+            row_start_x = WIDTH // 2 - row_w // 2 + badge_radius
+            row_y = badge_start_y + row_index * (badge_radius * 2 + badge_row_gap)
+            for i, achievement in enumerate(row):
+                cx = row_start_x + i * (badge_radius * 2 + badge_gap_x)
+                badge_positions.append((achievement, (cx, row_y)))
+
+        badge_label_h = badge_label_font.get_height()
+        settings_content_h = (
+            badge_start_y
+            + (len(badge_rows) - 1) * (badge_radius * 2 + badge_row_gap)
+            + badge_radius + 8 + badge_label_h
+            + int(clamp(16 * SCALE, 12, 20))
+        )
+        settings_max_scroll = max(0, settings_content_h - SETTINGS_BAND_H)
+        settings_scroll = 0
+        settings_dragging = False
+        settings_drag_start_y = 0
+        settings_drag_scroll_start = 0
+
+        while running and not needs_rebuild:
+            mouse_pos = pygame.mouse.get_pos()
+            # Grid-local mouse position for card hit-testing - the header/tab bar
+            # are fixed on screen now, only the grid below GRID_TOP scrolls.
+            mouse_grid_pos = (mouse_pos[0], mouse_pos[1] - GRID_TOP + scroll)
+            ticks = pygame.time.get_ticks()
+            tab_rects = category_tab_rects()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+
+                elif event.type == pygame.VIDEORESIZE:
+                    needs_rebuild = True
+
+                elif state == STATE_MENU:
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+                        scroll = min(scroll + SCROLL_SPEED, max_scroll)
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+                        scroll = max(scroll - SCROLL_SPEED, 0)
+                    elif event.type == pygame.MOUSEWHEEL:
+                        scroll = max(0, min(scroll - event.y * SCROLL_SPEED, max_scroll))
+                    elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if gear_rect.collidepoint(event.pos):
+                            gate_question = make_gate_question()
+                            gate_message = ""
+                            state = STATE_GATE
+                        elif nav_rect.collidepoint(event.pos):
+                            go_to_arcade()
+                        elif featured_rect.collidepoint(event.pos):
+                            await press_feedback(featured_rect, featured_game["hover"])
+                            record_game_launch(progress, featured_game["name"])
+                            try:
+                                await launch_game(featured_game)
+                            except Exception as exc:
+                                # A crashing game drops the child back to the
+                                # hub instead of taking the whole app down.
+                                print(f"Game '{featured_game['name']}' crashed: {exc!r}")
+                            finally:
+                                screen = pygame.display.set_mode(
+                                    (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE
+                                )
                                 resize_window()
                                 pygame.display.set_caption("Kid Zone")
                                 load_images()
-                                break
-                    dragging = False
+                        else:
+                            clicked_tab = False
+                            for cat, rect in zip(CATEGORY_ORDER, tab_rects):
+                                if rect.collidepoint(event.pos):
+                                    clicked_tab = True
+                                    if cat != active_category:
+                                        active_category = cat
+                                        cards = layout_cards(active_category)
+                                        max_scroll = max(
+                                            0, content_height(cards) - (HEIGHT - GRID_TOP)
+                                        )
+                                        scroll = 0
+                                        grid_bg = make_background(
+                                            WIDTH, max(content_height(cards), HEIGHT - GRID_TOP),
+                                            y_offset=GRID_TOP, total_height=HEIGHT,
+                                        )
+                                    break
 
-            elif state == STATE_GATE:
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if gate_back_rect.collidepoint(event.pos):
-                        state = STATE_MENU
-                    else:
-                        for i, rect in enumerate(gate_choice_rects):
-                            if rect.collidepoint(event.pos):
-                                if gate_question["choices"][i] == gate_question["answer"]:
-                                    state = STATE_SETTINGS
-                                    confirm_reset = False
-                                    settings_scroll = 0
-                                    settings_dragging = False
-                                else:
-                                    gate_message = "Not quite - try again!"
-                                    gate_message_until = ticks + 1500
-                                    gate_question = make_gate_question()
-                                break
+                            if not clicked_tab and event.pos[1] >= GRID_TOP:
+                                dragging = True
+                                drag_start_y = event.pos[1]
+                                drag_scroll_start = scroll
+                                drag_moved = 0
+                    elif event.type == pygame.MOUSEMOTION and dragging:
+                        dy = event.pos[1] - drag_start_y
+                        drag_moved = max(drag_moved, abs(dy))
+                        scroll = max(0, min(drag_scroll_start - dy, max_scroll))
+                    elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                        if dragging and drag_moved < DRAG_CLICK_THRESHOLD:
+                            tap_pos = (event.pos[0], event.pos[1] - GRID_TOP + scroll)
+                            for card in cards:
+                                if card.is_hovered(tap_pos):
+                                    press_rect = card.rect.move(0, GRID_TOP - scroll)
+                                    await press_feedback(press_rect, card.game["hover"])
+                                    record_game_launch(progress, card.game["name"])
+                                    try:
+                                        await launch_game(card.game)
+                                    except Exception as exc:
+                                        print(f"Game '{card.game['name']}' crashed: {exc!r}")
+                                    finally:
+                                        screen = pygame.display.set_mode(
+                                            (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE
+                                        )
+                                        resize_window()
+                                        pygame.display.set_caption("Kid Zone")
+                                        load_images()
+                                    break
+                        dragging = False
 
-            elif state == STATE_SETTINGS:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
-                    settings_scroll = min(settings_scroll + SCROLL_SPEED, settings_max_scroll)
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
-                    settings_scroll = max(settings_scroll - SCROLL_SPEED, 0)
-                elif event.type == pygame.MOUSEWHEEL:
-                    settings_scroll = max(
-                        0, min(settings_scroll - event.y * SCROLL_SPEED, settings_max_scroll)
-                    )
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if settings_back_rect.collidepoint(event.pos):
-                        state = STATE_MENU
-                        confirm_reset = False
-                    elif confirm_reset:
-                        if confirm_yes_rect.collidepoint(event.pos):
-                            progress = reset_progress()
+                elif state == STATE_GATE:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if gate_back_rect.collidepoint(event.pos):
+                            state = STATE_MENU
+                        else:
+                            for i, rect in enumerate(gate_choice_rects):
+                                if rect.collidepoint(event.pos):
+                                    if gate_question["choices"][i] == gate_question["answer"]:
+                                        state = STATE_SETTINGS
+                                        confirm_reset = False
+                                        settings_scroll = 0
+                                        settings_dragging = False
+                                    else:
+                                        gate_message = "Not quite - try again!"
+                                        gate_message_until = ticks + 1500
+                                        gate_question = make_gate_question()
+                                    break
+
+                elif state == STATE_SETTINGS:
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+                        settings_scroll = min(settings_scroll + SCROLL_SPEED, settings_max_scroll)
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+                        settings_scroll = max(settings_scroll - SCROLL_SPEED, 0)
+                    elif event.type == pygame.MOUSEWHEEL:
+                        settings_scroll = max(
+                            0, min(settings_scroll - event.y * SCROLL_SPEED, settings_max_scroll)
+                        )
+                    elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if settings_back_rect.collidepoint(event.pos):
+                            state = STATE_MENU
                             confirm_reset = False
-                        elif confirm_no_rect.collidepoint(event.pos):
-                            confirm_reset = False
-                    elif reset_button_rect.collidepoint(event.pos):
-                        confirm_reset = True
-                    elif settings_band_rect.collidepoint(event.pos) and settings_max_scroll > 0:
-                        # Drag-to-scroll: only starts inside the band, so it
-                        # can never swallow a tap on the fixed back/footer
-                        # buttons (which sit outside it).
-                        settings_dragging = True
-                        settings_drag_start_y = event.pos[1]
-                        settings_drag_scroll_start = settings_scroll
-                elif event.type == pygame.MOUSEMOTION and settings_dragging:
-                    dy = event.pos[1] - settings_drag_start_y
-                    settings_scroll = max(
-                        0, min(settings_drag_scroll_start - dy, settings_max_scroll)
-                    )
-                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                    settings_dragging = False
+                        elif confirm_reset:
+                            if confirm_yes_rect.collidepoint(event.pos):
+                                progress = reset_progress()
+                                confirm_reset = False
+                            elif confirm_no_rect.collidepoint(event.pos):
+                                confirm_reset = False
+                        elif reset_button_rect.collidepoint(event.pos):
+                            confirm_reset = True
+                        elif settings_band_rect.collidepoint(event.pos) and settings_max_scroll > 0:
+                            # Drag-to-scroll: only starts inside the band, so it
+                            # can never swallow a tap on the fixed back/footer
+                            # buttons (which sit outside it).
+                            settings_dragging = True
+                            settings_drag_start_y = event.pos[1]
+                            settings_drag_scroll_start = settings_scroll
+                    elif event.type == pygame.MOUSEMOTION and settings_dragging:
+                        dy = event.pos[1] - settings_drag_start_y
+                        settings_scroll = max(
+                            0, min(settings_drag_scroll_start - dy, settings_max_scroll)
+                        )
+                    elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                        settings_dragging = False
 
-        if state == STATE_MENU:
-            screen.fill(BG_COLOR)
-            screen.blit(header_bg, (0, 0))
+            if state == STATE_MENU:
+                screen.fill(BG_COLOR)
+                screen.blit(header_bg, (0, 0))
 
-            title_surf = title_font.render("Kid Zone", True, TITLE_COLOR)
-            total_w = mascot_size + title_gap + title_surf.get_width()
-            start_x = WIDTH // 2 - total_w // 2
-            mascot_center = (start_x + mascot_size // 2, HEADER_Y)
-            screen.blit(
-                title_surf,
-                title_surf.get_rect(midleft=(start_x + mascot_size + title_gap, HEADER_Y)),
-            )
-            draw_sunny(screen, mascot_center, mascot_size, ticks)
+                title_surf = title_font.render("Kid Zone", True, TITLE_COLOR)
+                total_w = mascot_size + title_gap + title_surf.get_width()
+                start_x = WIDTH // 2 - total_w // 2
+                mascot_center = (start_x + mascot_size // 2, HEADER_Y)
+                screen.blit(
+                    title_surf,
+                    title_surf.get_rect(midleft=(start_x + mascot_size + title_gap, HEADER_Y)),
+                )
+                draw_sunny(screen, mascot_center, mascot_size, ticks)
 
-            subtitle_surf = subtitle_font.render(
-                "Adventure Starts Here!", True, SUBTITLE_COLOR
-            )
-            screen.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, SUBTITLE_Y)))
+                subtitle_surf = subtitle_font.render(
+                    "Adventure Starts Here!", True, SUBTITLE_COLOR
+                )
+                screen.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, SUBTITLE_Y)))
 
-            # Compact progress area - reuses the same progress fields the
-            # achievements screen already tracks (games explored / total
-            # achievements unlocked), no new backend state invented. On its
-            # own row below the subtitle so the two can never collide.
-            explored = len(progress["games_played"])
-            earned = len(progress["achievements_unlocked"])
-            trophy_rect = draw_stat_pill(
-                screen, WIDTH - CARD_MARGIN, STATS_Y, earned, draw_glyph_trophy, SUN_DEEP_COLOR, stat_pill_font
-            )
-            star_rect = draw_stat_pill(
-                screen, trophy_rect.left - 10, STATS_Y, explored, draw_glyph_star, TEAL_COLOR, stat_pill_font
-            )
-
-            # Streak pill lives on this same row (chained off the star pill),
-            # not up on the HEADER_Y row - that row is already tight with the
-            # nav icon/mascot/title/gear on narrow phones, and anchoring the
-            # streak pill next to the gear there collided with the title text.
-            draw_streak_pill(
-                screen, star_rect.left - 10, STATS_Y, progress["streak_days"], ticks, stat_pill_font
-            )
-
-            gear_hovered = gear_rect.collidepoint(mouse_pos)
-            draw_icon_button(screen, gear_rect.center, gear_radius, gear_hovered, draw_lock_icon)
-
-            nav_hovered = nav_rect.collidepoint(mouse_pos)
-            draw_icon_button(screen, nav_rect.center, gear_radius, nav_hovered, draw_arcade_icon)
-
-            draw_category_tabs(screen, active_category, mouse_pos, tab_font)
-
-            featured_hovered = featured_rect.collidepoint(mouse_pos)
-            draw_featured_card(screen, featured_rect, featured_game, featured_fonts, featured_hovered)
-
-            # ---- Scrollable card grid, clipped so it never draws over the header ----
-            grid_h = max(content_height(cards), HEIGHT - GRID_TOP)
-            grid_surface = grid_bg.copy()
-
-            for card in cards:
-                hovered = mouse_pos[1] >= GRID_TOP and card.is_hovered(mouse_grid_pos)
-                color = card.game["hover"] if hovered else card.game["color"]
-
-                if hovered:
-                    rect = card.rect.inflate(16, 16)
-                    rect.centery -= 4
-                    draw_soft_shadow(grid_surface, rect, CARD_RADIUS, offset_y=16, pad=10, alpha=95)
-                else:
-                    rect = card.rect
-                    draw_soft_shadow(grid_surface, rect, CARD_RADIUS, offset_y=8, pad=6, alpha=70)
-
-                pygame.draw.rect(grid_surface, color, rect, border_radius=CARD_RADIUS)
-
-                # Subtle glossy sheen across the top of the card so it reads
-                # as a polished game tile rather than a flat color swatch.
-                # Cached like draw_soft_shadow - every visible card shares one
-                # of only two sizes (hovered/not), so there's no need to
-                # rebuild this surface for every card on every frame.
-                gloss_h = max(CARD_RADIUS, int(rect.height * 0.38))
-                gloss_key = (rect.width, gloss_h)
-                gloss_surf = _gloss_cache.get(gloss_key)
-                if gloss_surf is None:
-                    gloss_surf = pygame.Surface((rect.width, gloss_h), pygame.SRCALPHA)
-                    pygame.draw.rect(
-                        gloss_surf, (255, 255, 255, 30), gloss_surf.get_rect(),
-                        border_top_left_radius=CARD_RADIUS, border_top_right_radius=CARD_RADIUS,
-                    )
-                    _gloss_cache[gloss_key] = gloss_surf
-                grid_surface.blit(gloss_surf, rect.topleft)
-
-                pygame.draw.rect(grid_surface, PAPER_COLOR, rect, width=3, border_radius=CARD_RADIUS)
-
-                image = card.game["image_surface"]
-                img_top = rect.top + int(clamp(18 * SCALE, 12, 18))
-                grid_surface.blit(image, image.get_rect(midtop=(rect.centerx, img_top)))
-
-                name_top = img_top + IMAGE_SIZE + int(clamp(12 * SCALE, 8, 12))
-                name_surf = name_font.render(card.game["name"], True, (255, 255, 255))
-                grid_surface.blit(
-                    name_surf, name_surf.get_rect(midtop=(rect.centerx, name_top))
+                # Compact progress area - reuses the same progress fields the
+                # achievements screen already tracks (games explored / total
+                # achievements unlocked), no new backend state invented. On its
+                # own row below the subtitle so the two can never collide.
+                explored = len(progress["games_played"])
+                earned = len(progress["achievements_unlocked"])
+                trophy_rect = draw_stat_pill(
+                    screen, WIDTH - CARD_MARGIN, STATS_Y, earned, draw_glyph_trophy, SUN_DEEP_COLOR, stat_pill_font
+                )
+                star_rect = draw_stat_pill(
+                    screen, trophy_rect.left - 10, STATS_Y, explored, draw_glyph_star, TEAL_COLOR, stat_pill_font
                 )
 
-                comment_top = name_top + name_surf.get_height() + int(clamp(8 * SCALE, 5, 8))
-                line_step = comment_font.get_height() + 2
-                lines = card.game["comment"].split("\n")
-                for i, line in enumerate(lines):
-                    line_surf = comment_font.render(line, True, (255, 255, 255))
+                # Streak pill lives on this same row (chained off the star pill),
+                # not up on the HEADER_Y row - that row is already tight with the
+                # nav icon/mascot/title/gear on narrow phones, and anchoring the
+                # streak pill next to the gear there collided with the title text.
+                draw_streak_pill(
+                    screen, star_rect.left - 10, STATS_Y, progress["streak_days"], ticks, stat_pill_font
+                )
+
+                gear_hovered = gear_rect.collidepoint(mouse_pos)
+                draw_icon_button(screen, gear_rect.center, gear_radius, gear_hovered, draw_lock_icon)
+
+                nav_hovered = nav_rect.collidepoint(mouse_pos)
+                draw_icon_button(screen, nav_rect.center, gear_radius, nav_hovered, draw_arcade_icon)
+
+                draw_category_tabs(screen, active_category, mouse_pos, tab_font)
+
+                featured_hovered = featured_rect.collidepoint(mouse_pos)
+                draw_featured_card(screen, featured_rect, featured_game, featured_fonts, featured_hovered)
+
+                # ---- Scrollable card grid, clipped so it never draws over the header ----
+                grid_h = max(content_height(cards), HEIGHT - GRID_TOP)
+                grid_surface = grid_bg.copy()
+
+                for card in cards:
+                    hovered = mouse_pos[1] >= GRID_TOP and card.is_hovered(mouse_grid_pos)
+                    color = card.game["hover"] if hovered else card.game["color"]
+
+                    if hovered:
+                        rect = card.rect.inflate(16, 16)
+                        rect.centery -= 4
+                        draw_soft_shadow(grid_surface, rect, CARD_RADIUS, offset_y=16, pad=10, alpha=95)
+                    else:
+                        rect = card.rect
+                        draw_soft_shadow(grid_surface, rect, CARD_RADIUS, offset_y=8, pad=6, alpha=70)
+
+                    pygame.draw.rect(grid_surface, color, rect, border_radius=CARD_RADIUS)
+
+                    # Subtle glossy sheen across the top of the card so it reads
+                    # as a polished game tile rather than a flat color swatch.
+                    # Cached like draw_soft_shadow - every visible card shares one
+                    # of only two sizes (hovered/not), so there's no need to
+                    # rebuild this surface for every card on every frame.
+                    gloss_h = max(CARD_RADIUS, int(rect.height * 0.38))
+                    gloss_key = (rect.width, gloss_h)
+                    gloss_surf = _gloss_cache.get(gloss_key)
+                    if gloss_surf is None:
+                        gloss_surf = pygame.Surface((rect.width, gloss_h), pygame.SRCALPHA)
+                        pygame.draw.rect(
+                            gloss_surf, (255, 255, 255, 30), gloss_surf.get_rect(),
+                            border_top_left_radius=CARD_RADIUS, border_top_right_radius=CARD_RADIUS,
+                        )
+                        _gloss_cache[gloss_key] = gloss_surf
+                    grid_surface.blit(gloss_surf, rect.topleft)
+
+                    pygame.draw.rect(grid_surface, PAPER_COLOR, rect, width=3, border_radius=CARD_RADIUS)
+
+                    image = card.game["image_surface"]
+                    img_top = rect.top + int(clamp(18 * SCALE, 12, 18))
+                    grid_surface.blit(image, image.get_rect(midtop=(rect.centerx, img_top)))
+
+                    name_top = img_top + IMAGE_SIZE + int(clamp(12 * SCALE, 8, 12))
+                    name_surf = name_font.render(card.game["name"], True, (255, 255, 255))
                     grid_surface.blit(
-                        line_surf,
-                        line_surf.get_rect(
-                            midtop=(rect.centerx, comment_top + i * line_step)
+                        name_surf, name_surf.get_rect(midtop=(rect.centerx, name_top))
+                    )
+
+                    comment_top = name_top + name_surf.get_height() + int(clamp(8 * SCALE, 5, 8))
+                    line_step = comment_font.get_height() + 2
+                    lines = card.game["comment"].split("\n")
+                    for i, line in enumerate(lines):
+                        line_surf = comment_font.render(line, True, (255, 255, 255))
+                        grid_surface.blit(
+                            line_surf,
+                            line_surf.get_rect(
+                                midtop=(rect.centerx, comment_top + i * line_step)
+                            ),
+                        )
+
+                prev_clip = screen.get_clip()
+                screen.set_clip(pygame.Rect(0, GRID_TOP, WIDTH, HEIGHT - GRID_TOP))
+                screen.blit(grid_surface, (0, GRID_TOP - scroll))
+                screen.set_clip(prev_clip)
+
+                if max_scroll > 0:
+                    track_x = WIDTH - 14
+                    track_h = HEIGHT - GRID_TOP
+                    pygame.draw.rect(
+                        screen, SCROLLBAR_COLOR, (track_x, GRID_TOP, 8, track_h), border_radius=4
+                    )
+                    thumb_h = max(30, track_h * track_h // grid_h)
+                    thumb_y = GRID_TOP + (
+                        int(scroll / max_scroll * (track_h - thumb_h)) if max_scroll else 0
+                    )
+                    pygame.draw.rect(
+                        screen, SCROLLBAR_THUMB_COLOR, (track_x, thumb_y, 8, thumb_h), border_radius=4
+                    )
+
+            elif state == STATE_GATE:
+                screen.blit(settings_bg, (0, 0))
+
+                title_surf = gate_title_font.render("Grown-ups Only", True, TITLE_COLOR)
+                screen.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, GATE_TITLE_Y)))
+
+                q_text = f"What is {gate_question['a']} + {gate_question['b']}?"
+                q_surf = name_font.render(q_text, True, TEXT_COLOR)
+                screen.blit(q_surf, q_surf.get_rect(center=(WIDTH // 2, GATE_Q_Y)))
+
+                hint_surf = comment_font.render(
+                    "Answer the question to open parent settings.", True, SUBTITLE_COLOR
+                )
+                screen.blit(hint_surf, hint_surf.get_rect(center=(WIDTH // 2, GATE_HINT_Y)))
+
+                for i, rect in enumerate(gate_choice_rects):
+                    hovered = rect.collidepoint(mouse_pos)
+                    draw_button(
+                        screen, rect, str(gate_question["choices"][i]), button_font,
+                        TEAL_COLOR, TEAL_DEEP_COLOR, hovered,
+                    )
+
+                if gate_message and ticks < gate_message_until:
+                    msg_surf = comment_font.render(gate_message, True, CORAL_DEEP_COLOR)
+                    screen.blit(msg_surf, msg_surf.get_rect(center=(WIDTH // 2, GATE_MSG_Y)))
+
+                back_hovered = gate_back_rect.collidepoint(mouse_pos)
+                draw_button(
+                    screen, gate_back_rect, "Back to Kid Zone", button_font,
+                    INK_SOFT_COLOR, INK_COLOR, back_hovered,
+                )
+
+            elif state == STATE_SETTINGS:
+                screen.blit(settings_bg, (0, 0))
+
+                title_surf = settings_title_font.render("Parent Settings", True, TITLE_COLOR)
+                screen.blit(title_surf, title_surf.get_rect(center=(SETTINGS_TITLE_X, SETTINGS_TITLE_Y)))
+
+                # Scrollable band: content is laid out in content space, so it
+                # draws at (content_y - settings_scroll + band top), clipped so
+                # it can never spill over the fixed title or footer buttons.
+                settings_prev_clip = screen.get_clip()
+                screen.set_clip(settings_band_rect)
+                content_dy = SETTINGS_SCROLL_TOP - settings_scroll
+
+                streak_word = "day" if progress["streak_days"] == 1 else "days"
+                longest_word = "day" if progress["longest_streak"] == 1 else "days"
+                if IS_NARROW:
+                    # Two shorter lines instead of one long joined string, which
+                    # would otherwise overflow off both edges of a phone width.
+                    streak_surf = stat_font.render(
+                        f"Current Streak: {progress['streak_days']} {streak_word}", True, TEXT_COLOR
+                    )
+                    screen.blit(
+                        streak_surf,
+                        streak_surf.get_rect(center=(WIDTH // 2, SET_STATS_Y + content_dy)),
+                    )
+                    longest_surf = stat_font.render(
+                        f"Longest Streak: {progress['longest_streak']} {longest_word}", True, TEXT_COLOR
+                    )
+                    screen.blit(
+                        longest_surf,
+                        longest_surf.get_rect(center=(WIDTH // 2, SET_STATS_Y2 + content_dy)),
+                    )
+                else:
+                    stats_text = (
+                        f"Current Streak: {progress['streak_days']} {streak_word}   |   "
+                        f"Longest Streak: {progress['longest_streak']} {longest_word}"
+                    )
+                    stats_surf = stat_font.render(stats_text, True, TEXT_COLOR)
+                    screen.blit(
+                        stats_surf,
+                        stats_surf.get_rect(center=(WIDTH // 2, SET_STATS_Y + content_dy)),
+                    )
+
+                games_text = (
+                    f"Games played: {len(progress['games_played'])}/{len(GAMES)}   |   "
+                    f"Total launches: {progress['total_launches']}"
+                )
+                games_surf = comment_font.render(games_text, True, SUBTITLE_COLOR)
+                screen.blit(
+                    games_surf, games_surf.get_rect(center=(WIDTH // 2, SET_GAMES_Y + content_dy))
+                )
+
+                for achievement, center in badge_positions:
+                    badge_center = (center[0], center[1] + content_dy)
+                    if not (
+                        -badge_radius * 3 <= badge_center[1] - SETTINGS_SCROLL_TOP
+                        <= SETTINGS_BAND_H + badge_radius * 3
+                    ):
+                        continue  # fully scrolled out of the band
+                    unlocked = achievement["id"] in progress["achievements_unlocked"]
+                    draw_badge(screen, badge_center, badge_radius, achievement, unlocked)
+                    label_color = TEXT_COLOR if unlocked else INK_SOFT_COLOR
+                    label_surf = badge_label_font.render(achievement["name"], True, label_color)
+                    screen.blit(
+                        label_surf,
+                        label_surf.get_rect(
+                            midtop=(badge_center[0], badge_center[1] + badge_radius + 8)
                         ),
                     )
 
-            prev_clip = screen.get_clip()
-            screen.set_clip(pygame.Rect(0, GRID_TOP, WIDTH, HEIGHT - GRID_TOP))
-            screen.blit(grid_surface, (0, GRID_TOP - scroll))
-            screen.set_clip(prev_clip)
+                screen.set_clip(settings_prev_clip)
 
-            if max_scroll > 0:
-                track_x = WIDTH - 14
-                track_h = HEIGHT - GRID_TOP
-                pygame.draw.rect(
-                    screen, SCROLLBAR_COLOR, (track_x, GRID_TOP, 8, track_h), border_radius=4
-                )
-                thumb_h = max(30, track_h * track_h // grid_h)
-                thumb_y = GRID_TOP + (
-                    int(scroll / max_scroll * (track_h - thumb_h)) if max_scroll else 0
-                )
-                pygame.draw.rect(
-                    screen, SCROLLBAR_THUMB_COLOR, (track_x, thumb_y, 8, thumb_h), border_radius=4
-                )
+                if settings_max_scroll > 0:
+                    track_x = WIDTH - 14
+                    track_h = SETTINGS_BAND_H
+                    thumb_h = max(30, track_h * track_h // settings_content_h)
+                    thumb_y = SETTINGS_SCROLL_TOP + int(
+                        settings_scroll / settings_max_scroll * (track_h - thumb_h)
+                    )
+                    pygame.draw.rect(
+                        screen, SCROLLBAR_THUMB_COLOR, (track_x, thumb_y, 8, thumb_h), border_radius=4
+                    )
 
-        elif state == STATE_GATE:
-            screen.blit(settings_bg, (0, 0))
+                if confirm_reset:
+                    confirm_surf = comment_font.render(
+                        "Erase all progress and streaks?", True, CORAL_DEEP_COLOR
+                    )
+                    confirm_msg_y = confirm_yes_rect.top - CONFIRM_MSG_OFFSET
+                    screen.blit(confirm_surf, confirm_surf.get_rect(center=(WIDTH // 2, confirm_msg_y)))
+                    yes_hovered = confirm_yes_rect.collidepoint(mouse_pos)
+                    no_hovered = confirm_no_rect.collidepoint(mouse_pos)
+                    draw_button(
+                        screen, confirm_yes_rect, "Yes, Reset", button_font,
+                        CORAL_COLOR, CORAL_DEEP_COLOR, yes_hovered,
+                    )
+                    draw_button(
+                        screen, confirm_no_rect, "Cancel", button_font,
+                        INK_SOFT_COLOR, INK_COLOR, no_hovered,
+                    )
+                else:
+                    reset_hovered = reset_button_rect.collidepoint(mouse_pos)
+                    draw_button(
+                        screen, reset_button_rect, "Reset Progress", button_font,
+                        CORAL_COLOR, CORAL_DEEP_COLOR, reset_hovered,
+                    )
 
-            title_surf = gate_title_font.render("Grown-ups Only", True, TITLE_COLOR)
-            screen.blit(title_surf, title_surf.get_rect(center=(WIDTH // 2, GATE_TITLE_Y)))
-
-            q_text = f"What is {gate_question['a']} + {gate_question['b']}?"
-            q_surf = name_font.render(q_text, True, TEXT_COLOR)
-            screen.blit(q_surf, q_surf.get_rect(center=(WIDTH // 2, GATE_Q_Y)))
-
-            hint_surf = comment_font.render(
-                "Answer the question to open parent settings.", True, SUBTITLE_COLOR
-            )
-            screen.blit(hint_surf, hint_surf.get_rect(center=(WIDTH // 2, GATE_HINT_Y)))
-
-            for i, rect in enumerate(gate_choice_rects):
-                hovered = rect.collidepoint(mouse_pos)
+                back_hovered = settings_back_rect.collidepoint(mouse_pos)
                 draw_button(
-                    screen, rect, str(gate_question["choices"][i]), button_font,
-                    TEAL_COLOR, TEAL_DEEP_COLOR, hovered,
+                    screen, settings_back_rect, "< Back", button_font,
+                    TEAL_COLOR, TEAL_DEEP_COLOR, back_hovered,
                 )
 
-            if gate_message and ticks < gate_message_until:
-                msg_surf = comment_font.render(gate_message, True, CORAL_DEEP_COLOR)
-                screen.blit(msg_surf, msg_surf.get_rect(center=(WIDTH // 2, GATE_MSG_Y)))
+            # Poll the real viewport a few times a second: a phone rotating
+            # or a browser window resizing has to re-derive the whole layout,
+            # and pygbag does not reliably raise VIDEORESIZE for it.
+            if not needs_rebuild and ticks - last_viewport_check > 250:
+                last_viewport_check = ticks
+                vw, vh = get_viewport_size(built_viewport)
+                if abs(vw - built_viewport[0]) > 8 or abs(vh - built_viewport[1]) > 8:
+                    needs_rebuild = True
 
-            back_hovered = gate_back_rect.collidepoint(mouse_pos)
-            draw_button(
-                screen, gate_back_rect, "Back to Kid Zone", button_font,
-                INK_SOFT_COLOR, INK_COLOR, back_hovered,
-            )
-
-        elif state == STATE_SETTINGS:
-            screen.blit(settings_bg, (0, 0))
-
-            title_surf = settings_title_font.render("Parent Settings", True, TITLE_COLOR)
-            screen.blit(title_surf, title_surf.get_rect(center=(SETTINGS_TITLE_X, SETTINGS_TITLE_Y)))
-
-            # Scrollable band: content is laid out in content space, so it
-            # draws at (content_y - settings_scroll + band top), clipped so
-            # it can never spill over the fixed title or footer buttons.
-            settings_prev_clip = screen.get_clip()
-            screen.set_clip(settings_band_rect)
-            content_dy = SETTINGS_SCROLL_TOP - settings_scroll
-
-            streak_word = "day" if progress["streak_days"] == 1 else "days"
-            longest_word = "day" if progress["longest_streak"] == 1 else "days"
-            if IS_NARROW:
-                # Two shorter lines instead of one long joined string, which
-                # would otherwise overflow off both edges of a phone width.
-                streak_surf = stat_font.render(
-                    f"Current Streak: {progress['streak_days']} {streak_word}", True, TEXT_COLOR
-                )
-                screen.blit(
-                    streak_surf,
-                    streak_surf.get_rect(center=(WIDTH // 2, SET_STATS_Y + content_dy)),
-                )
-                longest_surf = stat_font.render(
-                    f"Longest Streak: {progress['longest_streak']} {longest_word}", True, TEXT_COLOR
-                )
-                screen.blit(
-                    longest_surf,
-                    longest_surf.get_rect(center=(WIDTH // 2, SET_STATS_Y2 + content_dy)),
-                )
-            else:
-                stats_text = (
-                    f"Current Streak: {progress['streak_days']} {streak_word}   |   "
-                    f"Longest Streak: {progress['longest_streak']} {longest_word}"
-                )
-                stats_surf = stat_font.render(stats_text, True, TEXT_COLOR)
-                screen.blit(
-                    stats_surf,
-                    stats_surf.get_rect(center=(WIDTH // 2, SET_STATS_Y + content_dy)),
-                )
-
-            games_text = (
-                f"Games played: {len(progress['games_played'])}/{len(GAMES)}   |   "
-                f"Total launches: {progress['total_launches']}"
-            )
-            games_surf = comment_font.render(games_text, True, SUBTITLE_COLOR)
-            screen.blit(
-                games_surf, games_surf.get_rect(center=(WIDTH // 2, SET_GAMES_Y + content_dy))
-            )
-
-            for achievement, center in badge_positions:
-                badge_center = (center[0], center[1] + content_dy)
-                if not (
-                    -badge_radius * 3 <= badge_center[1] - SETTINGS_SCROLL_TOP
-                    <= SETTINGS_BAND_H + badge_radius * 3
-                ):
-                    continue  # fully scrolled out of the band
-                unlocked = achievement["id"] in progress["achievements_unlocked"]
-                draw_badge(screen, badge_center, badge_radius, achievement, unlocked)
-                label_color = TEXT_COLOR if unlocked else INK_SOFT_COLOR
-                label_surf = badge_label_font.render(achievement["name"], True, label_color)
-                screen.blit(
-                    label_surf,
-                    label_surf.get_rect(
-                        midtop=(badge_center[0], badge_center[1] + badge_radius + 8)
-                    ),
-                )
-
-            screen.set_clip(settings_prev_clip)
-
-            if settings_max_scroll > 0:
-                track_x = WIDTH - 14
-                track_h = SETTINGS_BAND_H
-                thumb_h = max(30, track_h * track_h // settings_content_h)
-                thumb_y = SETTINGS_SCROLL_TOP + int(
-                    settings_scroll / settings_max_scroll * (track_h - thumb_h)
-                )
-                pygame.draw.rect(
-                    screen, SCROLLBAR_THUMB_COLOR, (track_x, thumb_y, 8, thumb_h), border_radius=4
-                )
-
-            if confirm_reset:
-                confirm_surf = comment_font.render(
-                    "Erase all progress and streaks?", True, CORAL_DEEP_COLOR
-                )
-                confirm_msg_y = confirm_yes_rect.top - CONFIRM_MSG_OFFSET
-                screen.blit(confirm_surf, confirm_surf.get_rect(center=(WIDTH // 2, confirm_msg_y)))
-                yes_hovered = confirm_yes_rect.collidepoint(mouse_pos)
-                no_hovered = confirm_no_rect.collidepoint(mouse_pos)
-                draw_button(
-                    screen, confirm_yes_rect, "Yes, Reset", button_font,
-                    CORAL_COLOR, CORAL_DEEP_COLOR, yes_hovered,
-                )
-                draw_button(
-                    screen, confirm_no_rect, "Cancel", button_font,
-                    INK_SOFT_COLOR, INK_COLOR, no_hovered,
-                )
-            else:
-                reset_hovered = reset_button_rect.collidepoint(mouse_pos)
-                draw_button(
-                    screen, reset_button_rect, "Reset Progress", button_font,
-                    CORAL_COLOR, CORAL_DEEP_COLOR, reset_hovered,
-                )
-
-            back_hovered = settings_back_rect.collidepoint(mouse_pos)
-            draw_button(
-                screen, settings_back_rect, "< Back", button_font,
-                TEAL_COLOR, TEAL_DEEP_COLOR, back_hovered,
-            )
-
-        pygame.display.flip()
-        clock.tick(60)
-        await asyncio.sleep(0)
+            pygame.display.flip()
+            clock.tick(60)
+            await asyncio.sleep(0)
 
     pygame.quit()
 
