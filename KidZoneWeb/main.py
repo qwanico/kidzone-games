@@ -40,7 +40,7 @@ SCALE = 1.0
 IS_NARROW = False
 IS_SHORT = False
 
-# Fixed header (title/streak/tabs/featured) stays put; only the card grid
+# Fixed header (title/streak/tabs) stays put; only the card grid
 # below it scrolls, so switching categories always lands on a stable,
 # un-scrolled page.
 HEADER_Y = 58
@@ -51,8 +51,6 @@ TAB_BAR_TOP = 143
 TAB_HEIGHT = 44
 TAB_PAD_X = 26
 TAB_GAP = 14
-FEATURED_TOP = 190
-FEATURED_H = 150
 
 
 def get_viewport_size(default=(1000, 700)):
@@ -93,7 +91,7 @@ def apply_responsive_layout(width, height):
     global WIDTH, HEIGHT, COLS, CARD_W, CARD_H, CARD_GAP, CARD_MARGIN
     global IMAGE_SIZE, CARD_RADIUS, SCALE, IS_NARROW, HEADER_Y
     global GRID_TOP, TAB_BAR_TOP, TAB_HEIGHT, TAB_PAD_X, TAB_GAP
-    global FEATURED_TOP, FEATURED_H, SUBTITLE_Y, STATS_Y, IS_SHORT
+    global SUBTITLE_Y, STATS_Y, IS_SHORT
 
     WIDTH = clamp(width, 360, 1600)
     # Keep the logical surface equal to the real viewport wherever possible.
@@ -105,7 +103,7 @@ def apply_responsive_layout(width, height):
     IS_NARROW = WIDTH < 760
     SCALE = clamp(WIDTH / 1000, 0.62, 1.2)
     # A rotated phone is wide but very short: the full-height header stack
-    # (title + subtitle + pills + tabs + featured banner) would eat ~75% of
+    # (title + subtitle + pills + tabs) would eat too much of
     # the screen and leave the scrollable grid a thin unusable strip.
     IS_SHORT = HEIGHT < 620
 
@@ -143,16 +141,12 @@ def apply_responsive_layout(width, height):
         SUBTITLE_Y = HEADER_Y + int(clamp(26 * SCALE, 21, 28))
         STATS_Y = SUBTITLE_Y + int(clamp(24 * SCALE, 19, 26))
         TAB_BAR_TOP = STATS_Y + int(clamp(18 * SCALE, 14, 20))
-        FEATURED_TOP = TAB_BAR_TOP + TAB_HEIGHT + int(clamp(12 * SCALE, 9, 14))
-        FEATURED_H = int(clamp(96 * SCALE, 80, 104))
-        GRID_TOP = FEATURED_TOP + FEATURED_H + int(clamp(14 * SCALE, 11, 16))
+        GRID_TOP = TAB_BAR_TOP + TAB_HEIGHT + int(clamp(14 * SCALE, 11, 16))
     else:
         SUBTITLE_Y = HEADER_Y + int(clamp(40 * SCALE, 32, 40))
         STATS_Y = SUBTITLE_Y + int(clamp(34 * SCALE, 26, 34))
         TAB_BAR_TOP = STATS_Y + int(clamp(26 * SCALE, 20, 26))
-        FEATURED_TOP = TAB_BAR_TOP + TAB_HEIGHT + int(clamp(18 * SCALE, 14, 18))
-        FEATURED_H = int(clamp(158 * SCALE, 128, 158))
-        GRID_TOP = FEATURED_TOP + FEATURED_H + int(clamp(22 * SCALE, 16, 22))
+        GRID_TOP = TAB_BAR_TOP + TAB_HEIGHT + int(clamp(22 * SCALE, 16, 22))
 
 # ---------------------------------------------------------------------------
 # Design tokens - warm cream "felt-board" palette (matches the approved
@@ -623,7 +617,7 @@ def layout_cards(active_category):
     return cards
 
 
-def category_tab_rects():
+def category_tab_rects(dy=0):
     """Three big equal-width buttons spanning the same margins as the card
     grid below them - large, evenly-spaced touch targets rather than pills
     sized tightly to their own label text."""
@@ -633,13 +627,13 @@ def category_tab_rects():
     rects = []
     x = CARD_MARGIN
     for _ in range(n):
-        rects.append(pygame.Rect(x, TAB_BAR_TOP, tab_w, TAB_HEIGHT))
+        rects.append(pygame.Rect(x, TAB_BAR_TOP + dy, tab_w, TAB_HEIGHT))
         x += tab_w + TAB_GAP
     return rects
 
 
-def draw_category_tabs(surface, active_category, mouse_pos, font):
-    rects = category_tab_rects()
+def draw_category_tabs(surface, active_category, mouse_pos, font, dy=0):
+    rects = category_tab_rects(dy)
     icon_size = int(TAB_HEIGHT * 0.48)
     icon_gap = int(clamp(10 * SCALE, 7, 10))
     for cat, rect in zip(CATEGORY_ORDER, rects):
@@ -731,7 +725,6 @@ def make_background(width, height, y_offset=0, total_height=None):
 
 _shadow_cache = {}
 _gloss_cache = {}
-_featured_icon_cache = {}
 
 
 def draw_soft_shadow(surface, rect, radius, offset_y=8, pad=6, alpha=70):
@@ -890,69 +883,6 @@ def draw_stat_pill(surface, right_x, center_y, value, glyph_fn, glyph_color, fon
     glyph_fn(surface, glyph_center, pill_h * 0.36, glyph_color)
     surface.blit(num_surf, num_surf.get_rect(midleft=(rect.x + pill_h * 0.5 + 15, rect.centery)))
     return rect
-
-
-def draw_featured_card(surface, rect, game, fonts, play_hovered):
-    """'Today's Adventure' banner - an obvious, unmissable starting point
-    for a child, built entirely from an existing game's own name/icon/
-    description/click-handler rather than a fake placeholder game."""
-    draw_soft_shadow(surface, rect, radius=CARD_RADIUS, offset_y=8, pad=8, alpha=65)
-    pygame.draw.rect(surface, game["color"], rect, border_radius=CARD_RADIUS)
-    pygame.draw.rect(surface, PAPER_COLOR, rect, width=3, border_radius=CARD_RADIUS)
-
-    pad = int(clamp(18 * SCALE, 12, 18))
-
-    icon_size = int(rect.height * 0.6)
-    # icon_size is constant for a given layout, but this runs every frame of
-    # the hub - cache the resample instead of repeating it 60x a second.
-    icon_key = (game["key"], icon_size)
-    icon = _featured_icon_cache.get(icon_key)
-    if icon is None:
-        icon = pygame.transform.smoothscale(game["image_surface"], (icon_size, icon_size))
-        _featured_icon_cache[icon_key] = icon
-    plate_rect = pygame.Rect(0, 0, icon_size + pad, icon_size + pad)
-    plate_rect.midleft = (rect.x + pad, rect.centery)
-    pygame.draw.rect(surface, PAPER_COLOR, plate_rect, border_radius=int(CARD_RADIUS * 0.7))
-    surface.blit(icon, icon.get_rect(center=plate_rect.center))
-
-    btn_w = int(clamp(148 * SCALE, 118, 156))
-    btn_h = int(clamp(46 * SCALE, 38, 48))
-    play_rect = pygame.Rect(0, 0, btn_w, btn_h)
-    play_rect.bottomright = (rect.right - pad, rect.bottom - pad)
-
-    text_x = plate_rect.right + pad
-    # Always measured against the button's actual position (it never
-    # moves off bottom-right) - using a looser limit on narrow screens
-    # previously let wide description text get drawn and then silently
-    # painted over by the button itself, instead of being skipped.
-    text_right_limit = play_rect.left - pad
-
-    eyebrow_surf = fonts["featured_eyebrow"].render("TODAY'S ADVENTURE", True, PAPER_COLOR)
-    surface.blit(eyebrow_surf, (text_x, rect.y + pad))
-
-    title_surf = fonts["featured_title"].render(game["name"], True, PAPER_COLOR)
-    title_y = rect.y + pad + eyebrow_surf.get_height() + 2
-    surface.blit(title_surf, (text_x, title_y))
-
-    desc_line = game["comment"].replace("\n", " ")
-    desc_font = fonts["featured_desc"]
-    desc_surf = desc_font.render(desc_line, True, PAPER_COLOR)
-    desc_y = title_y + title_surf.get_height() + 4
-    too_wide = desc_surf.get_width() > text_right_limit - text_x and text_right_limit > text_x
-    # The short/landscape banner is not tall enough for a third line, and
-    # without this check the description spilled out below the card onto
-    # the game grid underneath it.
-    too_tall = desc_y + desc_surf.get_height() > rect.bottom - pad
-    if not (too_wide or too_tall):
-        # otherwise drop it rather than clip it - the eyebrow + title +
-        # PLAY NOW button already carry the message.
-        surface.blit(desc_surf, (text_x, desc_y))
-
-    draw_button(
-        surface, play_rect, "PLAY NOW", fonts["featured_btn"],
-        PAPER_COLOR, BOARD_2_COLOR, play_hovered, text_color=game["color"],
-    )
-    return play_rect
 
 
 def draw_button(surface, rect, label, font, base_color, hover_color, hovered, text_color=(255, 255, 255)):
@@ -1273,20 +1203,12 @@ async def main():
         subtitle_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", subtitle_size)
         stat_pill_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", stat_pill_size)
         tab_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(24 * SCALE, 17, 25)))
-        featured_fonts = {
-            "featured_eyebrow": pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 12, 15))),
-            "featured_title": pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29))),
-            "featured_desc": pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", int(clamp(17 * SCALE, 13, 17))),
-            "featured_btn": pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(19 * SCALE, 15, 19))),
-        }
 
         cards = layout_cards(active_category)
-        max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP))
+        max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP)
+                         + (GRID_TOP if IS_SHORT else 0))
         scroll = max(0, min(scroll, max_scroll))
 
-        # Today's Adventure: an existing game (Find The Food), not an invented
-        # placeholder - keeps a single, obvious starting point for a child.
-        featured_game = next((g for g in GAMES if g["key"] == "fruit_finder"), GAMES[0])
 
         header_bg = make_background(WIDTH, GRID_TOP, y_offset=0, total_height=HEIGHT)
         grid_bg = make_background(
@@ -1304,7 +1226,7 @@ async def main():
         drag_scroll_start = 0
         drag_moved = 0
 
-        # Brief squash-and-recover press feedback before a card/featured/play
+        # Brief squash-and-recover press feedback before a card
         # launch actually hands off to the game - purely visual, drawn as a
         # few extra frames on top of the current screen rather than requiring
         # a rewrite of the whole per-frame drawing pipeline.
@@ -1326,7 +1248,6 @@ async def main():
         nav_rect = pygame.Rect(0, 0, gear_radius * 2, gear_radius * 2)
         nav_rect.center = nav_center
 
-        featured_rect = pygame.Rect(CARD_MARGIN, FEATURED_TOP, WIDTH - CARD_MARGIN * 2, FEATURED_H)
 
         # Shrink the "Kid Zone" title/mascot group to fit if needed, so it can
         # never collide with the gear icon + streak pill cluster on the right
@@ -1501,15 +1422,17 @@ async def main():
                     elif event.type == pygame.MOUSEWHEEL:
                         scroll = max(0, min(scroll - event.y * SCROLL_SPEED, max_scroll))
                     elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                        if gear_rect.collidepoint(event.pos):
+                        head_dy = -scroll if IS_SHORT else 0
+                        if gear_rect.move(0, head_dy).collidepoint(event.pos):
                             gate_question = make_gate_question()
                             gate_message = ""
                             state = STATE_GATE
-                        elif nav_rect.collidepoint(event.pos):
+                        elif nav_rect.move(0, head_dy).collidepoint(event.pos):
                             go_to_arcade()
                         else:
                             clicked_tab = False
-                            for cat, rect in zip(CATEGORY_ORDER, tab_rects):
+                            for cat, rect in zip(CATEGORY_ORDER,
+                                                 category_tab_rects(head_dy)):
                                 if rect.collidepoint(event.pos):
                                     clicked_tab = True
                                     if cat != active_category:
@@ -1517,6 +1440,7 @@ async def main():
                                         cards = layout_cards(active_category)
                                         max_scroll = max(
                                             0, content_height(cards) - (HEIGHT - GRID_TOP)
+                                            + (GRID_TOP if IS_SHORT else 0)
                                         )
                                         scroll = 0
                                         grid_bg = make_background(
@@ -1527,12 +1451,13 @@ async def main():
 
                             # Drag can start anywhere below the tab bar, not
                             # just below GRID_TOP. On a rotated phone the
-                            # header + featured banner cover most of the
-                            # screen, so restricting it to the grid left only
-                            # a thin strip that responded to a scroll swipe.
-                            # A tap that doesn't move is still resolved as a
-                            # click on release (featured card or game card).
-                            if not clicked_tab and event.pos[1] >= TAB_BAR_TOP + TAB_HEIGHT:
+                            # header covers a lot of a rotated phone, so
+                            # restricting drags to the grid left only a thin
+                            # strip that responded to a scroll swipe. A tap
+                            # that doesn't move still resolves as a card click
+                            # on release.
+                            drag_from = 0 if IS_SHORT else TAB_BAR_TOP + TAB_HEIGHT
+                            if not clicked_tab and event.pos[1] >= drag_from:
                                 dragging = True
                                 drag_start_y = event.pos[1]
                                 drag_scroll_start = scroll
@@ -1543,29 +1468,6 @@ async def main():
                         scroll = max(0, min(drag_scroll_start - dy, max_scroll))
                     elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                         if dragging and drag_moved < DRAG_CLICK_THRESHOLD:
-                            if featured_rect.collidepoint(event.pos):
-                                # Resolved on release, not press, so a scroll
-                                # swipe that starts on the banner scrolls
-                                # instead of launching the game.
-                                await press_feedback(featured_rect, featured_game["hover"])
-                                record_game_launch(progress, featured_game["name"])
-                                try:
-                                    await launch_game(featured_game)
-                                except Exception as exc:
-                                    # A crashing game drops the child back to
-                                    # the hub instead of killing the app.
-                                    print(f"Game '{featured_game['name']}' crashed: {exc!r}")
-                                finally:
-                                    screen = pygame.display.set_mode(
-                                        (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE
-                                    )
-                                    resize_window()
-                                    resize_frames_left = 8
-                                    pygame.display.set_caption("Kid Zone")
-                                    load_images()
-                                dragging = False
-                                continue
-
                             tap_pos = (event.pos[0], event.pos[1] - GRID_TOP + scroll)
                             for card in cards:
                                 if card.is_hovered(tap_pos):
@@ -1649,16 +1551,21 @@ async def main():
                         settings_dragging = False
 
             if state == STATE_MENU:
+                # On a short/rotated screen the header scrolls away with the
+                # grid, so the whole page moves as one - the header would
+                # otherwise eat most of the height and leave a thin strip.
+                head_dy = -scroll if IS_SHORT else 0
+
                 screen.fill(BG_COLOR)
-                screen.blit(header_bg, (0, 0))
+                screen.blit(header_bg, (0, head_dy))
 
                 title_surf = title_font.render("Kid Zone", True, TITLE_COLOR)
                 total_w = mascot_size + title_gap + title_surf.get_width()
                 start_x = WIDTH // 2 - total_w // 2
-                mascot_center = (start_x + mascot_size // 2, HEADER_Y)
+                mascot_center = (start_x + mascot_size // 2, HEADER_Y + head_dy)
                 screen.blit(
                     title_surf,
-                    title_surf.get_rect(midleft=(start_x + mascot_size + title_gap, HEADER_Y)),
+                    title_surf.get_rect(midleft=(start_x + mascot_size + title_gap, HEADER_Y + head_dy)),
                 )
                 draw_sunny(screen, mascot_center, mascot_size, ticks)
 
@@ -1669,7 +1576,7 @@ async def main():
                         "Adventure Starts Here!", True, SUBTITLE_COLOR
                     )
                     screen.blit(
-                        subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, SUBTITLE_Y))
+                        subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, SUBTITLE_Y + head_dy))
                     )
 
                 # Compact progress area - reuses the same progress fields the
@@ -1679,10 +1586,10 @@ async def main():
                 explored = len(progress["games_played"])
                 earned = len(progress["achievements_unlocked"])
                 trophy_rect = draw_stat_pill(
-                    screen, WIDTH - CARD_MARGIN, STATS_Y, earned, draw_glyph_trophy, SUN_DEEP_COLOR, stat_pill_font
+                    screen, WIDTH - CARD_MARGIN, STATS_Y + head_dy, earned, draw_glyph_trophy, SUN_DEEP_COLOR, stat_pill_font
                 )
                 star_rect = draw_stat_pill(
-                    screen, trophy_rect.left - 10, STATS_Y, explored, draw_glyph_star, TEAL_COLOR, stat_pill_font
+                    screen, trophy_rect.left - 10, STATS_Y + head_dy, explored, draw_glyph_star, TEAL_COLOR, stat_pill_font
                 )
 
                 # Streak pill lives on this same row (chained off the star pill),
@@ -1690,19 +1597,19 @@ async def main():
                 # nav icon/mascot/title/gear on narrow phones, and anchoring the
                 # streak pill next to the gear there collided with the title text.
                 draw_streak_pill(
-                    screen, star_rect.left - 10, STATS_Y, progress["streak_days"], ticks, stat_pill_font
+                    screen, star_rect.left - 10, STATS_Y + head_dy, progress["streak_days"], ticks, stat_pill_font
                 )
 
-                gear_hovered = gear_rect.collidepoint(mouse_pos)
-                draw_icon_button(screen, gear_rect.center, gear_radius, gear_hovered, draw_lock_icon)
+                gear_draw = gear_rect.move(0, head_dy)
+                gear_hovered = gear_draw.collidepoint(mouse_pos)
+                draw_icon_button(screen, gear_draw.center, gear_radius, gear_hovered, draw_lock_icon)
 
-                nav_hovered = nav_rect.collidepoint(mouse_pos)
-                draw_icon_button(screen, nav_rect.center, gear_radius, nav_hovered, draw_arcade_icon)
+                nav_draw = nav_rect.move(0, head_dy)
+                nav_hovered = nav_draw.collidepoint(mouse_pos)
+                draw_icon_button(screen, nav_draw.center, gear_radius, nav_hovered, draw_arcade_icon)
 
-                draw_category_tabs(screen, active_category, mouse_pos, tab_font)
+                draw_category_tabs(screen, active_category, mouse_pos, tab_font, head_dy)
 
-                featured_hovered = featured_rect.collidepoint(mouse_pos)
-                draw_featured_card(screen, featured_rect, featured_game, featured_fonts, featured_hovered)
 
                 # ---- Scrollable card grid, clipped so it never draws over the header ----
                 grid_h = max(content_height(cards), HEIGHT - GRID_TOP)
@@ -1763,9 +1670,11 @@ async def main():
                             ),
                         )
 
+                grid_y = GRID_TOP - scroll
+                clip_top = 0 if IS_SHORT else GRID_TOP
                 prev_clip = screen.get_clip()
-                screen.set_clip(pygame.Rect(0, GRID_TOP, WIDTH, HEIGHT - GRID_TOP))
-                screen.blit(grid_surface, (0, GRID_TOP - scroll))
+                screen.set_clip(pygame.Rect(0, clip_top, WIDTH, HEIGHT - clip_top))
+                screen.blit(grid_surface, (0, grid_y))
                 screen.set_clip(prev_clip)
 
                 if max_scroll > 0:
