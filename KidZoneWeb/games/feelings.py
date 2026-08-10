@@ -11,6 +11,17 @@ try:
 except ImportError:
     platform = None
 
+try:
+    from .common import fx
+    from .common.audio import VoicePlayer, available_voices
+    from .common.widgets import AnswerButton, draw_home_icon
+except ImportError:  # standalone `python games/feelings.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import fx
+    from common.audio import VoicePlayer, available_voices
+    from common.widgets import AnswerButton, draw_home_icon
+
 BASE_DIR = Path(__file__).parent / "feelings_assets"
 VOICE_DIR = BASE_DIR / "voice_cache"
 SOUNDS_DIR = BASE_DIR / "sounds"
@@ -63,68 +74,20 @@ def to_display_name(word: str) -> str:
 
 
 def load_feelings():
-    return sorted(p.stem for p in VOICE_DIR.glob("*.ogg") if not p.stem.endswith("-pygbag"))
+    return available_voices(VOICE_DIR)
 
 
-def build_gradient(width, height, top_color, bottom_color):
-    surf = pygame.Surface((width, height))
-    for y in range(height):
-        t = y / max(1, height - 1)
-        r = int(top_color[0] + (bottom_color[0] - top_color[0]) * t)
-        g = int(top_color[1] + (bottom_color[1] - top_color[1]) * t)
-        b = int(top_color[2] + (bottom_color[2] - top_color[2]) * t)
-        pygame.draw.line(surf, (r, g, b), (0, y), (width, y))
-    return surf
+BUTTON_PALETTE = {
+    "base": BUTTON_COLOR,
+    "hover": BUTTON_HOVER,
+    "correct": CORRECT_COLOR,
+    "wrong": WRONG_COLOR,
+}
 
 
-def draw_home_icon(surface, rect, color, hovered=False):
-    bg = tuple(min(255, c + 15) for c in color) if hovered else color
-    pygame.draw.rect(surface, bg, rect, border_radius=12)
-    pygame.draw.rect(surface, (255, 255, 255), rect, width=3, border_radius=12)
-
-    cx, cy = rect.center
-    w, h = rect.width, rect.height
-
-    roof_half = w * 0.30
-    roof_top_y = cy - h * 0.26
-    roof_base_y = cy - h * 0.02
-
-    body_w = w * 0.42
-    body_h = h * 0.32
-    body_rect = pygame.Rect(0, 0, body_w, body_h)
-    body_rect.midtop = (cx, roof_base_y)
-    pygame.draw.rect(surface, (255, 255, 255), body_rect, border_radius=2)
-
-    roof_points = [
-        (cx - roof_half, roof_base_y),
-        (cx, roof_top_y),
-        (cx + roof_half, roof_base_y),
-    ]
-    pygame.draw.polygon(surface, (255, 255, 255), roof_points)
-
-
-class Button:
-    def __init__(self, rect, word):
-        self.rect = pygame.Rect(rect)
-        self.word = word
-        self.state = "idle"
-
-    def draw(self, surface, font, mouse_pos):
-        if self.state == "correct":
-            color = CORRECT_COLOR
-        elif self.state == "wrong":
-            color = WRONG_COLOR
-        elif self.rect.collidepoint(mouse_pos):
-            color = BUTTON_HOVER
-        else:
-            color = BUTTON_COLOR
-
-        pygame.draw.rect(surface, color, self.rect, border_radius=24)
-        pygame.draw.rect(surface, (255, 255, 255), self.rect, width=3, border_radius=24)
-
-        text_surf = font.render(self.word, True, (255, 255, 255))
-        text_rect = text_surf.get_rect(center=self.rect.center)
-        surface.blit(text_surf, text_rect)
+def Button(rect, label):
+    """Thin shim so existing call sites keep their shape."""
+    return AnswerButton(rect, label, BUTTON_PALETTE)
 
 
 class FrameAnimation:
@@ -165,9 +128,7 @@ class Game:
     def __init__(self):
         pygame.init()
         pygame.mixer.init()
-        pygame.mixer.set_reserved(1)
-        self.voice_channel = pygame.mixer.Channel(0)
-        self.voice_cache = {}
+        self.voice = VoicePlayer(VOICE_DIR)
 
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
         if platform is not None and hasattr(platform, "window"):
@@ -218,7 +179,7 @@ class Game:
         self.quit_requested = False
 
         # --- decorative background (soft drifting bubbles over a calm gradient) ---
-        self.bg_surface = build_gradient(WIDTH, HEIGHT, BG_TOP_COLOR, BG_BOTTOM_COLOR)
+        self.bg_surface = fx.build_gradient(WIDTH, HEIGHT, BG_TOP_COLOR, BG_BOTTOM_COLOR)
         self.bubbles = [self._make_bubble(initial=True) for _ in range(14)]
 
         # --- confetti / particle burst on correct answers ---
@@ -259,43 +220,15 @@ class Game:
             self.screen.blit(s, (b["x"] - r, b["y"] - r))
 
     def spawn_particles(self, cx, cy, streak):
-        count = 16 + min(streak, 10) * 2
-        for _ in range(count):
-            angle = random.uniform(0, math.tau)
-            speed = random.uniform(110, 300)
-            self.particles.append({
-                "x": cx,
-                "y": cy,
-                "vx": math.cos(angle) * speed,
-                "vy": math.sin(angle) * speed - random.uniform(80, 180),
-                "color": random.choice(CONFETTI_COLORS),
-                "size": random.randint(4, 8),
-                "angle": random.uniform(0, 360),
-                "spin": random.uniform(-360, 360),
-                "age": 0.0,
-                "life": random.uniform(0.6, 1.1),
-            })
+        self.particles.extend(
+            fx.spawn_confetti(cx, cy, CONFETTI_COLORS, count=16 + min(streak, 10) * 2)
+        )
 
     def update_particles(self, dt_ms):
-        dt = dt_ms / 1000
-        for p in self.particles:
-            p["age"] += dt
-            p["x"] += p["vx"] * dt
-            p["y"] += p["vy"] * dt
-            p["vy"] += GRAVITY * dt
-            p["angle"] += p["spin"] * dt
-        self.particles = [p for p in self.particles if p["age"] < p["life"]]
+        fx.update_confetti(self.particles, dt_ms, GRAVITY)
 
     def draw_particles(self):
-        for p in self.particles:
-            t = p["age"] / p["life"]
-            alpha = max(0, int(255 * (1 - t)))
-            size = p["size"] * 2
-            piece = pygame.Surface((size, size), pygame.SRCALPHA)
-            pygame.draw.rect(piece, (*p["color"], alpha), (0, 0, size, size), border_radius=2)
-            rotated = pygame.transform.rotate(piece, p["angle"])
-            rect = rotated.get_rect(center=(p["x"], p["y"]))
-            self.screen.blit(rotated, rect)
+        fx.draw_confetti(self.screen, self.particles)
 
     def draw_milestone(self):
         if pygame.time.get_ticks() >= self.milestone_until:
@@ -314,21 +247,17 @@ class Game:
     def enter_pause(self):
         ticks = pygame.time.get_ticks()
         self._pause_remaining = (self.feedback_until - ticks) if self.feedback_until > ticks else None
-        self.voice_channel.pause()
+        self.voice.pause()
         self.state = STATE_PAUSED
 
     def resume_game(self):
         ticks = pygame.time.get_ticks()
         self.feedback_until = ticks + self._pause_remaining if self._pause_remaining else 0
-        self.voice_channel.unpause()
+        self.voice.unpause()
         self.state = STATE_PLAYING
 
     def speak(self, feeling):
-        path = str(VOICE_DIR / f"{feeling}.ogg")
-        if path not in self.voice_cache:
-            self.voice_cache[path] = pygame.mixer.Sound(path)
-        self.voice_channel.stop()
-        self.voice_channel.play(self.voice_cache[path])
+        self.voice.say(feeling)
 
     def new_round(self):
         choices = [f for f in self.feelings if f != self.last_feeling] or self.feelings
@@ -536,7 +465,7 @@ class Game:
 
             await asyncio.sleep(0)
 
-        self.voice_channel.stop()
+        self.voice.stop()
 
 
 if __name__ == "__main__":
