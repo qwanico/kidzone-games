@@ -13,11 +13,13 @@ except ImportError:
 try:
     from .common import fx
     from .common.widgets import draw_home_icon
+    from .common import display
 except ImportError:  # standalone `python games/maze.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import fx
     from common.widgets import draw_home_icon
+    from common import display
 
 BASE_DIR = Path(__file__).parent / "maze_assets"
 SOUNDS_DIR = BASE_DIR / "sounds"
@@ -542,6 +544,9 @@ class Game:
             self.draw_playing()
             self.draw_paused()
         pygame.display.flip()
+        _resized = display.maintain(WIDTH, HEIGHT)
+        if _resized is not None:
+            self.screen = _resized
 
     async def run(self):
         clock = pygame.time.Clock()

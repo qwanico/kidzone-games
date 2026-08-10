@@ -13,10 +13,12 @@ except ImportError:
 
 try:
     from .common import sfx
+    from .common import display
 except ImportError:  # standalone `python games/bug_squasher.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import sfx
+    from common import display
 
 WIDTH, HEIGHT = 900, 700
 BG_COLOR = (225, 235, 200)
@@ -401,6 +403,12 @@ async def run():
             )
 
         pygame.display.flip()
+
+        _resized = display.maintain(WIDTH, HEIGHT)
+
+        if _resized is not None:
+
+            screen = _resized
         clock.tick(60)
         await asyncio.sleep(0)
 

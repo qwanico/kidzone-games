@@ -14,12 +14,14 @@ try:
     from .common import fx
     from .common.audio import VoicePlayer, available_voices
     from .common.widgets import AnswerButton, draw_home_icon, draw_speaker_icon
+    from .common import display
 except ImportError:  # standalone `python games/letters.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import fx
     from common.audio import VoicePlayer, available_voices
     from common.widgets import AnswerButton, draw_home_icon, draw_speaker_icon
+    from common import display
 
 BASE_DIR = Path(__file__).parent / "letters_assets"
 VOICE_DIR = BASE_DIR / "voice_cache"
@@ -394,6 +396,12 @@ class Game:
             self.draw_paused()
 
         pygame.display.flip()
+
+        _resized = display.maintain(WIDTH, HEIGHT)
+
+        if _resized is not None:
+
+            self.screen = _resized
 
     async def run(self):
         clock = pygame.time.Clock()

@@ -504,37 +504,12 @@ frameborder="1"
         window.frames["iframe"].location = url;
     }
 
-    // --- Keep the canvas fitted when the device rotates -------------------
-    // pygbag only sizes the canvas via window_resize(), and only calls it at
-    // page boot plus wherever the Python side calls it explicitly. The hub
-    // re-calls it after its own set_mode(), but while a *game* is running the
-    // hub's loop is not executing, so rotating mid-game left that game's
-    // canvas fitted to the old orientation - rendering it zoomed/cropped.
-    // Handling it here covers the hub and all games at once, with no
-    // per-game Python changes.
-    (function () {
-        var pending = null;
-        function refit() {
-            try {
-                if (typeof window_resize === "function") window_resize();
-            } catch (e) { /* runtime not up yet; the boot call will cover it */ }
-        }
-        function schedule() {
-            if (pending) clearTimeout(pending);
-            // Debounced, and deliberately late: iOS Safari reports the old
-            // innerWidth/innerHeight for a moment after an orientation change,
-            // so refitting immediately fits to the size we are leaving.
-            pending = setTimeout(function () {
-                refit();
-                setTimeout(refit, 250);
-            }, 120);
-        }
-        window.addEventListener("resize", schedule);
-        window.addEventListener("orientationchange", schedule);
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener("resize", schedule);
-        }
-    })();
+    // A resize/orientationchange handler calling window_resize() used to live
+    // here. Removed deliberately: the hub and every game now re-run set_mode()
+    // themselves when the viewport changes (games/common/display.py), which
+    // rebuilds SDL's SCALED logical scale as well as the canvas box. A bare
+    // window_resize() firing after that resizes only the box and leaves the
+    // scale stale - the two fought, and the game rendered zoomed and cropped.
 
     </script>
 

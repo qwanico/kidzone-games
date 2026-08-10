@@ -10,6 +10,13 @@ try:
 except ImportError:
     platform = None
 
+try:
+    from .common import display
+except ImportError:  # standalone `python games/planets.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import display
+
 BASE_DIR = Path(__file__).parent / "planets_assets"
 SOUNDS_DIR = BASE_DIR / "sounds"
 IMAGES_DIR = BASE_DIR / "images"
@@ -527,6 +534,12 @@ class Game:
             self.draw_win()
 
         pygame.display.flip()
+
+        _resized = display.maintain(WIDTH, HEIGHT)
+
+        if _resized is not None:
+
+            self.screen = _resized
 
     async def run(self):
         clock = pygame.time.Clock()
