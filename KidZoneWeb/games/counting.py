@@ -7,13 +7,13 @@ import pygame
 
 try:
     from .common import text
-    from .common.quiz import VoiceQuizGame
+    from .common.quiz import VoiceQuizGame, clamp
     from .common.widgets import AnswerButton, draw_speaker_icon
 except ImportError:  # standalone `python games/counting.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import text
-    from common.quiz import VoiceQuizGame
+    from common.quiz import VoiceQuizGame, clamp
     from common.widgets import AnswerButton, draw_speaker_icon
 
 BASE_DIR = Path(__file__).parent / "counting_assets"
@@ -65,6 +65,8 @@ class Game(VoiceQuizGame):
     TITLE = "Counting"
     SUBTITLE = "Listen, then click the group with that many!"
 
+    BUTTON_SQUARE = True
+
     VOICE_DIR = BASE_DIR / "voice_cache"
     SOUNDS_DIR = BASE_DIR / "sounds"
 
@@ -76,9 +78,11 @@ class Game(VoiceQuizGame):
     SCORE_COLOR = (100, 55, 140)
     TITLE_COLOR = (100, 55, 140)
 
-    def setup(self):
-        self.font_reveal = text.SysFont("arial", 160, bold=True)
-        self.font_decor = text.SysFont("arial", 60, bold=True)
+    def layout_extras(self):
+        # Sized off the card rather than fixed, so the numeral still fits
+        # when a rotated phone leaves the card a fraction of its height.
+        self.font_reveal = text.SysFont("arial", int(self.CARD_SIZE * 0.53), bold=True)
+        self.font_decor = text.SysFont("arial", int(clamp(60 * self.SCALE, 30, 66)), bold=True)
 
     def load_items(self):
         available = self.available_voices()

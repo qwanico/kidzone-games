@@ -95,6 +95,8 @@ class Game(VoiceQuizGame):
     TITLE = "Shapes"
     SUBTITLE = "Listen, then click the shape you hear!"
 
+    BUTTON_SQUARE = True
+
     VOICE_DIR = BASE_DIR / "voice_cache"
     SOUNDS_DIR = BASE_DIR / "sounds"
 

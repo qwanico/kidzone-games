@@ -25,21 +25,12 @@ WIDTH, HEIGHT = 900, 700
 
 CLOUD_COLOR = (255, 255, 255)
 
-
 class Game(VoiceQuizGame):
     TITLE = "Sight Words"
     SUBTITLE = "Listen, then click the word you hear!"
 
     VOICE_DIR = BASE_DIR / "voice_cache"
     SOUNDS_DIR = BASE_DIR / "sounds"
-
-    CARD_SIZE = 360
-    CARD_TOP = 60
-    BUTTON_W, BUTTON_H = 320, 90
-    BUTTON_GAP = 40
-    BUTTON_Y = HEIGHT - 160
-    SCORE_POS = (100, 32)
-    FEEDBACK_OFFSET = 40
 
     CARD_BORDER = (190, 210, 230)
     SPEAKER_COLOR = (90, 160, 230)
@@ -60,8 +51,10 @@ class Game(VoiceQuizGame):
         (255, 160, 190),
     ]
 
-    def setup(self):
-        self.font_reveal = text.SysFont("arial", 90, bold=True)
+    def layout_extras(self):
+        # Words are long, so this is a much smaller fraction than the
+        # single-glyph games use.
+        self.font_reveal = text.SysFont("arial", int(self.CARD_SIZE * 0.25), bold=True)
 
     def load_items(self):
         return available_voices(self.VOICE_DIR)
@@ -109,7 +102,6 @@ class Game(VoiceQuizGame):
                 pygame.draw.circle(
                     self.screen, CLOUD_COLOR,
                     (int(x + dx * scale), int(y + dy * scale)), int(r * scale))
-
 
 if __name__ == "__main__":
     asyncio.run(Game().run())

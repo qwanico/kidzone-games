@@ -29,10 +29,24 @@ except ImportError:  # pragma: no cover
 
 _last_viewport = None
 _pending = None
+_override = None
+
+
+def set_viewport_override(size):
+    """Pretend the browser viewport is `size` (or None to stop pretending).
+
+    Only for tests: responsive layout is the one thing that cannot be
+    exercised headlessly without it, since there is no browser to ask."""
+    global _override, _last_viewport, _pending
+    _override = size
+    _last_viewport = None
+    _pending = None
 
 
 def viewport():
     """Real browser viewport, or None outside pygbag."""
+    if _override is not None:
+        return _override
     if platform is None or not hasattr(platform, "window"):
         return None
     try:
@@ -66,6 +80,41 @@ def maintain(width, height, flags=None):
     """
     global _last_viewport, _pending
 
+    vp = _confirmed_change()
+    if vp is None:
+        return None
+
+    _last_viewport = vp
+    _pending = None
+    return _set_mode(width, height, flags)
+
+
+def maintain_responsive(flags=None):
+    """Like maintain(), but re-creates the display at the *new* viewport size
+    rather than a fixed one, and reports that size back.
+
+    Returns (surface, (width, height)), or (None, None) when nothing changed.
+    A game that lays itself out from the real viewport needs the new size to
+    re-run that layout; one with a fixed design size does not, which is why
+    both forms exist.
+    """
+    global _last_viewport, _pending
+
+    vp = _confirmed_change()
+    if vp is None:
+        return None, None
+
+    _last_viewport = vp
+    _pending = None
+    surface = _set_mode(vp[0], vp[1], flags)
+    return (surface, vp) if surface is not None else (None, None)
+
+
+def _confirmed_change():
+    """The new viewport once a change has held across two calls, else None.
+    Shared so both maintain() forms debounce identically."""
+    global _last_viewport, _pending
+
     vp = viewport()
     if vp is None:
         return None
@@ -75,18 +124,15 @@ def maintain(width, height, flags=None):
     if vp == _last_viewport:
         _pending = None
         return None
-
-    dw = abs(vp[0] - _last_viewport[0])
-    dh = abs(vp[1] - _last_viewport[1])
-    if dw <= 8 and dh <= 140:
+    if abs(vp[0] - _last_viewport[0]) <= 8 and abs(vp[1] - _last_viewport[1]) <= 140:
         return None
-
     if _pending != vp:
         _pending = vp
         return None
+    return vp
 
-    _last_viewport = vp
-    _pending = None
+
+def _set_mode(width, height, flags):
     if flags is None:
         flags = pygame.SCALED | pygame.RESIZABLE
     try:

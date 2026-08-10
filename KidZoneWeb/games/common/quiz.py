@@ -12,8 +12,10 @@ This owns everything that was identical:
 
   * the async loop, the menu/playing/paused state machine, and the Escape and
     quit handling;
-  * display setup, the per-frame `display.maintain()` that keeps SCALED
-    correct across a rotation, and the pygbag `window_resize()` call;
+  * display setup and responsive layout: the screen is re-flowed from the
+    real browser viewport into header / card / feedback / answer bands, and
+    re-flowed again on a rotation, rather than scaling a fixed 900x700
+    design and letterboxing whatever does not fit;
   * pause that survives mid-feedback (the remaining feedback time is banked
     and restored, so pausing does not skip a round);
   * scoring, streaks, feedback text and its timing, the correct/wrong button
@@ -35,8 +37,13 @@ a working default:
         def draw_prompt(self, surface, rect, revealed):
             ...
 
-Subclasses keep their own module-level `WIDTH`/`HEIGHT` and palette names, so
-the hub's launch contract (`module` + `entry` in the registry) is unchanged
+Geometry is not configuration: `CARD_SIZE`, `BUTTON_W/H`, `BUTTON_Y` and the
+rest are computed by `layout()` and live on the instance. A subclass tunes
+proportions (`BUTTON_SQUARE`, `BUTTON_H_RATIO`) and re-derives anything it
+pre-sizes - its own fonts, scaled artwork - in `layout_extras()`, which runs
+on every layout including after a rotation.
+
+The hub's launch contract (`module` + `entry` in the registry) is unchanged,
 and each game still runs standalone with `python games/<name>.py`.
 """
 
@@ -56,6 +63,10 @@ STATE_MENU = "menu"
 STATE_PLAYING = "playing"
 STATE_PAUSED = "paused"
 
+def clamp(value, low, high):
+    return max(low, min(high, value))
+
+
 DEFAULT_CONFETTI = [
     (255, 99, 132), (255, 205, 86), (75, 192, 192),
     (54, 162, 235), (153, 102, 255), (255, 159, 64),
@@ -72,16 +83,12 @@ class VoiceQuizGame:
     SOUNDS_DIR = None         # required: Path to wrong.ogg
 
     # ---- layout -------------------------------------------------------
-    WIDTH, HEIGHT = 900, 700
-    CARD_SIZE = 300
-    CARD_TOP = 70
-    BUTTON_SIZE = 200         # square answer buttons
-    BUTTON_W = None           # override for wide buttons; defaults to BUTTON_SIZE
-    BUTTON_H = None
-    BUTTON_GAP = 60
-    BUTTON_Y = 450
-    SCORE_POS = (24, 20)
-    FEEDBACK_OFFSET = 35      # below the card
+    # The reference the type scale is expressed against, not a fixed canvas:
+    # layout() re-flows from the real viewport. Everything geometric below
+    # is derived there and exists on the instance, not the class.
+    DESIGN_W, DESIGN_H = 900, 700
+    BUTTON_H_RATIO = 0.13     # answer-button height as a fraction of the screen
+    BUTTON_SQUARE = False     # True when the answer is a picture, not a word
     CHOICES = 2
     FEEDBACK_MS = 1600
 
@@ -169,19 +176,12 @@ class VoiceQuizGame:
         pygame.mixer.init()
         self.voice = VoicePlayer(self.VOICE_DIR)
 
+        width, height = self.viewport_size()
         self.screen = pygame.display.set_mode(
-            (self.WIDTH, self.HEIGHT), pygame.SCALED | pygame.RESIZABLE
+            (width, height), pygame.SCALED | pygame.RESIZABLE
         )
         self._resize_browser_canvas()
         pygame.display.set_caption(self.TITLE)
-
-        self.font_word = text.SysFont("arial", 40, bold=True)
-        self.font_score = text.SysFont("arial", 28, bold=True)
-        self.font_feedback = text.SysFont("arial", 44, bold=True)
-        self.font_title = text.SysFont("arial", 68, bold=True)
-        self.font_subtitle = text.SysFont("arial", 26)
-        self.font_icon = text.SysFont("arial", 24, bold=True)
-        self.font_milestone = text.SysFont("arial", 40, bold=True)
 
         self.items = self.load_items()
         if len(self.items) < 2:
@@ -203,31 +203,132 @@ class VoiceQuizGame:
         self.milestone_until = 0
         self.particles = []
 
-        self.card_rect = pygame.Rect(0, 0, self.CARD_SIZE, self.CARD_SIZE)
-        self.card_rect.centerx = self.WIDTH // 2
-        self.card_rect.top = self.CARD_TOP
-
-        palette = self.button_palette()
-        self.start_button = AnswerButton(
-            (self.WIDTH // 2 - 140, 460, 280, 90), "Start", palette)
-        self.pause_button = AnswerButton((self.WIDTH - 90, 20, 60, 50), "II", palette)
-        self.resume_button = AnswerButton(
-            (self.WIDTH // 2 - 160, 340, 320, 80), "Resume", palette)
-        self.quit_button = AnswerButton(
-            (self.WIDTH // 2 - 160, 440, 320, 80), "Quit", palette)
-        self.home_button = pygame.Rect(20, 20, 60, 50)
-
-        self.init_background()
-
         self.state = STATE_MENU
         self._pause_remaining = None
         self.quit_requested = False
 
+        self.layout(width, height)
+        self.init_background()
         self.setup()
 
     def setup(self):
         """Last step of __init__, for subclass state. Runs after fonts,
         items and layout exist."""
+
+    def layout_extras(self):
+        """Re-derive anything sized from the layout: a subclass's own fonts,
+        and any pre-scaled artwork. Called on every layout, including after a
+        rotation, so nothing here may assume it runs once."""
+
+    # ---- responsive layout --------------------------------------------
+
+    def viewport_size(self):
+        """The size to lay out for: the real browser viewport, clamped, or
+        the design size outside a browser."""
+        vp = display.viewport()
+        if vp is None:
+            return self.DESIGN_W, self.DESIGN_H
+        return (clamp(vp[0], 360, 1600), clamp(vp[1], 320, 1300))
+
+    def layout(self, width, height):
+        """Re-flow every rect and font for a `width` x `height` surface.
+
+        Deliberately a re-flow rather than a uniform scale of the 900x700
+        design: scaling that design to a portrait phone means fitting to
+        width and letterboxing the rest, which is the problem, not the fix.
+        The screen is instead split into bands - header, card, feedback,
+        answer buttons - and each is measured from the real viewport.
+        """
+        self.WIDTH, self.HEIGHT = width, height
+        # Floor matches the hub's: below it text stops being legible for a
+        # four-year-old long before it stops fitting.
+        self.SCALE = clamp(width / self.DESIGN_W, 0.62, 1.35)
+        s = self.SCALE
+
+        margin = int(clamp(24 * s, 14, 32))
+        gap = int(clamp(40 * s, 14, 46))
+
+        self.font_word = text.SysFont("arial", int(clamp(40 * s, 22, 46)), bold=True)
+        self.font_score = text.SysFont("arial", int(clamp(28 * s, 17, 30)), bold=True)
+        self.font_feedback = text.SysFont("arial", int(clamp(44 * s, 24, 50)), bold=True)
+        self.font_title = text.SysFont("arial", int(clamp(68 * s, 34, 74)), bold=True)
+        self.font_subtitle = text.SysFont("arial", int(clamp(26 * s, 15, 28)))
+        self.font_icon = text.SysFont("arial", int(clamp(24 * s, 15, 26)), bold=True)
+        self.font_milestone = text.SysFont("arial", int(clamp(40 * s, 22, 44)), bold=True)
+
+        # --- header: home and pause flank the score ---
+        home_w = int(clamp(60 * s, 46, 66))
+        home_h = int(clamp(50 * s, 44, 56))
+        self.home_button = pygame.Rect(margin, margin, home_w, home_h)
+        self.pause_button = AnswerButton(
+            (width - margin - home_w, margin, home_w, home_h), "II",
+            self.button_palette())
+        self.SCORE_POS = (self.home_button.right + int(12 * s),
+                          margin + max(0, (home_h - self.font_score.get_height()) // 2))
+        header_bottom = self.home_button.bottom + int(clamp(12 * s, 8, 16))
+
+        # --- split what is left between the card and the answer buttons ---
+        # Order matters: the card is the question, so it gets a floor and the
+        # button band gives way to it. On a rotated phone there is very little
+        # height to divide, which is where a fixed design letterboxed instead.
+        avail = height - header_bottom - margin
+        feedback_h = self.font_feedback.get_height() + int(8 * s)
+        card_gap = int(clamp(16 * s, 10, 22))
+
+        count = self.CHOICES
+        btn_w = int((width - margin * 2 - gap * (count - 1)) / count)
+        btn_w = min(btn_w, int(clamp(340 * s, 150, 380)))
+
+        if self.BUTTON_SQUARE:
+            # A swatch, a dot cluster or a drawn shape reads as the answer
+            # only while it stays square, so the width gives way too.
+            btn_h = min(btn_w, int(clamp(0.34 * height, 56, 300)))
+            btn_w = btn_h
+        else:
+            btn_h = int(clamp(self.BUTTON_H_RATIO * height, 56, 160))
+
+        card = avail - feedback_h - card_gap - btn_h
+        floor = int(avail * 0.42)
+        if card < floor:
+            # 56 keeps the button comfortably above the 44px touch minimum.
+            btn_h = max(56, btn_h - (floor - card))
+            if self.BUTTON_SQUARE:
+                btn_w = min(btn_w, btn_h)
+            card = avail - feedback_h - card_gap - btn_h
+
+        self.BUTTON_W, self.BUTTON_H = btn_w, btn_h
+        self.BUTTON_GAP = gap
+        self.BUTTON_Y = height - margin - btn_h
+
+        self.FEEDBACK_OFFSET = int(clamp(14 * s, 8, 20)) + feedback_h // 2
+        card = int(clamp(min(width - margin * 2, card), 90, 560))
+        self.CARD_SIZE = card
+        self.card_rect = pygame.Rect(0, 0, card, card)
+        self.card_rect.centerx = width // 2
+        self.card_rect.centery = header_bottom + (
+            self.BUTTON_Y - feedback_h - card_gap - header_bottom) // 2
+
+        # --- menu and pause screens ---
+        wide = int(clamp(320 * s, 200, 340))
+        tall = int(clamp(88 * s, 60, 96))
+        self.start_button = AnswerButton(
+            (width // 2 - wide // 2, int(height * 0.62), wide, tall),
+            "Start", self.button_palette())
+        self.resume_button = AnswerButton(
+            (width // 2 - wide // 2, int(height * 0.48), wide, tall),
+            "Resume", self.button_palette())
+        self.quit_button = AnswerButton(
+            (width // 2 - wide // 2, int(height * 0.48) + tall + int(20 * s), wide, tall),
+            "Quit", self.button_palette())
+        self.TITLE_Y = int(height * 0.28)
+        self.SUBTITLE_Y = self.TITLE_Y + self.font_title.get_height()
+        self.MILESTONE_Y = self.home_button.centery
+
+        self.layout_extras()
+        # Buttons already on screen were built for the old geometry.
+        if self.buttons:
+            for button, rect in zip(self.buttons, self.button_rects(len(self.buttons))):
+                button.rect = rect
 
     def button_palette(self):
         return {
@@ -392,8 +493,7 @@ class VoiceQuizGame:
         return shown
 
     def button_rects(self, count):
-        w = self.BUTTON_W or self.BUTTON_SIZE
-        h = self.BUTTON_H or self.BUTTON_SIZE
+        w, h = self.BUTTON_W, self.BUTTON_H
         total = w * count + self.BUTTON_GAP * (count - 1)
         start_x = (self.WIDTH - total) // 2
         step = w + self.BUTTON_GAP
@@ -501,10 +601,12 @@ class VoiceQuizGame:
         self.draw_background(now)
 
         title_surf = self.font_title.render(self.TITLE, True, self.TITLE_COLOR)
-        self.screen.blit(title_surf, title_surf.get_rect(center=(self.WIDTH // 2, 220)))
+        self.screen.blit(
+            title_surf, title_surf.get_rect(center=(self.WIDTH // 2, self.TITLE_Y)))
 
         sub_surf = self.font_subtitle.render(self.SUBTITLE, True, self.TEXT_COLOR)
-        self.screen.blit(sub_surf, sub_surf.get_rect(center=(self.WIDTH // 2, 290)))
+        self.screen.blit(
+            sub_surf, sub_surf.get_rect(center=(self.WIDTH // 2, self.SUBTITLE_Y)))
 
         self.start_button.draw(self.screen, self.font_word, mouse_pos)
 
@@ -521,7 +623,7 @@ class VoiceQuizGame:
             return
         banner = self.font_milestone.render(
             self.milestone_text, True, self.MILESTONE_COLOR)
-        banner_rect = banner.get_rect(center=(self.WIDTH // 2, 45))
+        banner_rect = banner.get_rect(center=(self.WIDTH // 2, self.MILESTONE_Y))
         bg_rect = banner_rect.inflate(50, 24)
         pygame.draw.rect(self.screen, (255, 255, 255), bg_rect, border_radius=18)
         pygame.draw.rect(self.screen, self.MILESTONE_COLOR, bg_rect, 4, border_radius=18)
@@ -563,7 +665,8 @@ class VoiceQuizGame:
         self.screen.blit(overlay, (0, 0))
 
         paused = self.font_title.render("Paused", True, (255, 255, 255))
-        self.screen.blit(paused, paused.get_rect(center=(self.WIDTH // 2, 240)))
+        self.screen.blit(
+            paused, paused.get_rect(center=(self.WIDTH // 2, int(self.HEIGHT * 0.3))))
 
         self.resume_button.draw(self.screen, self.font_word, mouse_pos)
         self.quit_button.draw(self.screen, self.font_word, mouse_pos)
@@ -580,9 +683,11 @@ class VoiceQuizGame:
 
         # A rotation only takes effect through a fresh set_mode, and it has to
         # happen in the running game's own loop - the hub's is not executing.
-        resized = display.maintain(self.WIDTH, self.HEIGHT)
+        resized, size = display.maintain_responsive()
         if resized is not None:
             self.screen = resized
+            self.layout(*size)
+            self.init_background()
 
     def handle_event(self, event):
         """Return False to stop the loop. Subclasses may extend this."""

@@ -85,6 +85,8 @@ class Game(VoiceQuizGame):
     TITLE = "Colors"
     SUBTITLE = "Listen, then click the color you hear!"
 
+    BUTTON_SQUARE = True
+
     VOICE_DIR = BASE_DIR / "voice_cache"
     SOUNDS_DIR = BASE_DIR / "sounds"
 

@@ -16,12 +16,9 @@ BASE_DIR = Path(__file__).parent / "picture_words_assets"
 ASSETS_DIR = BASE_DIR / "assets"
 
 WIDTH, HEIGHT = 900, 700
-PICTURE_SIZE = 360
-
 
 def to_display_name(stem: str) -> str:
     return stem.replace("_", " ").title()
-
 
 class Game(VoiceQuizGame):
     TITLE = "Picture Words"
@@ -30,13 +27,6 @@ class Game(VoiceQuizGame):
     VOICE_DIR = BASE_DIR / "voice_cache"
     SOUNDS_DIR = BASE_DIR / "sounds"
 
-    CARD_SIZE = 360
-    CARD_TOP = 60
-    BUTTON_W, BUTTON_H = 320, 90
-    BUTTON_GAP = 40
-    BUTTON_Y = HEIGHT - 160
-    SCORE_POS = (100, 32)
-    FEEDBACK_OFFSET = 40
     FEEDBACK_MS = 1400
 
     CARD_BORDER = (210, 200, 170)
@@ -74,6 +64,12 @@ class Game(VoiceQuizGame):
     def setup(self):
         self.picture_surface = None
 
+    def layout_extras(self):
+        # The card changes size with the viewport, so a picture scaled once
+        # at load would be wrong after a rotation.
+        if getattr(self, "current", None) is not None:
+            self.picture_surface = self.load_picture(self.current)
+
     def load_items(self):
         """A playable item needs both halves - a picture and a clip naming
         it - so anything with only one is skipped rather than crashing mid
@@ -101,7 +97,7 @@ class Game(VoiceQuizGame):
     def load_picture(self, name):
         img = pygame.image.load(str(self.pictures[name])).convert_alpha()
         w, h = img.get_size()
-        scale = PICTURE_SIZE / max(w, h)
+        scale = self.CARD_SIZE / max(w, h)
         return pygame.transform.smoothscale(
             img, (max(1, int(w * scale)), max(1, int(h * scale))))
 
@@ -110,7 +106,6 @@ class Game(VoiceQuizGame):
         if self.picture_surface is not None:
             surface.blit(self.picture_surface,
                          self.picture_surface.get_rect(center=rect.center))
-
 
 if __name__ == "__main__":
     asyncio.run(Game().run())

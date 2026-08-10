@@ -18,21 +18,12 @@ BASE_DIR = Path(__file__).parent / "letters_assets"
 
 WIDTH, HEIGHT = 900, 700
 
-
 class Game(VoiceQuizGame):
     TITLE = "Letters"
     SUBTITLE = "Listen, then click the letter you hear!"
 
     VOICE_DIR = BASE_DIR / "voice_cache"
     SOUNDS_DIR = BASE_DIR / "sounds"
-
-    CARD_SIZE = 360
-    CARD_TOP = 60
-    BUTTON_W, BUTTON_H = 320, 90
-    BUTTON_GAP = 40
-    BUTTON_Y = HEIGHT - 160
-    SCORE_POS = (100, 32)
-    FEEDBACK_OFFSET = 40
 
     CARD_BORDER = (230, 200, 210)
     SPEAKER_COLOR = (220, 110, 150)
@@ -59,8 +50,8 @@ class Game(VoiceQuizGame):
         (150, 200, 255),
     ]
 
-    def setup(self):
-        self.font_reveal = text.SysFont("arial", 160, bold=True)
+    def layout_extras(self):
+        self.font_reveal = text.SysFont("arial", int(self.CARD_SIZE * 0.44), bold=True)
 
     def load_items(self):
         return available_voices(self.VOICE_DIR)
@@ -77,7 +68,6 @@ class Game(VoiceQuizGame):
             surface.blit(letter, letter.get_rect(center=rect.center))
         else:
             draw_speaker_icon(surface, rect.center, self.CARD_SIZE * 0.5, self.SPEAKER_COLOR)
-
 
 if __name__ == "__main__":
     asyncio.run(Game().run())

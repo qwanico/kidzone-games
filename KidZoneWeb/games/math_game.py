@@ -7,13 +7,13 @@ import pygame
 
 try:
     from .common import text
-    from .common.quiz import VoiceQuizGame
+    from .common.quiz import VoiceQuizGame, clamp
     from .common.widgets import AnswerButton, draw_speaker_icon
 except ImportError:  # standalone `python games/math_game.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import text
-    from common.quiz import VoiceQuizGame
+    from common.quiz import VoiceQuizGame, clamp
     from common.widgets import AnswerButton, draw_speaker_icon
 
 BASE_DIR = Path(__file__).parent / "math_game_assets"
@@ -24,7 +24,6 @@ FRUIT_SIZE = 30
 
 TEXT_COLOR = (50, 50, 60)
 GLOW_COLOR = (255, 210, 90)
-
 
 def fruit_grid_positions(count, area_rect, icon_size):
     """Lay `count` icons out in rows of five, centred in `area_rect`."""
@@ -43,7 +42,6 @@ def fruit_grid_positions(count, area_rect, icon_size):
         for col in range(row_count):
             positions.append((start_x + col * (icon_size + gap), y))
     return positions
-
 
 class FruitButton(AnswerButton):
     """Shows the numeral *and* that many apples, so a child who cannot yet
@@ -79,20 +77,14 @@ class FruitButton(AnswerButton):
                                          self.fruit_icon.get_width()):
             surface.blit(self.fruit_icon, (x, y))
 
-
 class Game(VoiceQuizGame):
     TITLE = "Math"
     SUBTITLE = "Listen, then click the right answer!"
 
+    BUTTON_H_RATIO = 0.21    # taller: the button holds a numeral above its apples
+
     VOICE_DIR = BASE_DIR / "voice_cache"
     SOUNDS_DIR = BASE_DIR / "sounds"
-
-    CARD_SIZE = 360
-    CARD_TOP = 60
-    BUTTON_W, BUTTON_H = 340, 150
-    BUTTON_GAP = 40
-    BUTTON_Y = HEIGHT - 195
-    FEEDBACK_OFFSET = 40
 
     BG_COLOR = (245, 250, 215)
     CARD_BORDER = (210, 225, 165)
@@ -108,13 +100,20 @@ class Game(VoiceQuizGame):
     BG_SHAPE_BOB = 14
 
     def setup(self):
-        self.font_equation = text.SysFont("arial", 90, bold=True)
-        self.font_number = text.SysFont("arial", 30, bold=True)
-        raw_fruit = pygame.image.load(str(ASSETS_DIR / "apple.png")).convert_alpha()
-        self.fruit_icon = pygame.transform.smoothscale(raw_fruit, (FRUIT_SIZE, FRUIT_SIZE))
         self.current_sum = 0
         self.shake_until = 0
         self.shake_seed = 0.0
+
+    def layout_extras(self):
+        self.font_equation = text.SysFont("arial", int(self.CARD_SIZE * 0.25), bold=True)
+        self.font_number = text.SysFont("arial", int(self.BUTTON_H * 0.2), bold=True)
+        # Five apples plus their gaps have to fit across a button, and the
+        # button is a fraction of the screen - so the icon is sized from it
+        # rather than fixed at 30px. Rescaled here, never per frame.
+        icon = int(clamp(min(FRUIT_SIZE * self.SCALE, (self.BUTTON_W - 6 * 6) / 5), 10, 44))
+        self._raw_fruit = getattr(self, "_raw_fruit", None) or \
+            pygame.image.load(str(ASSETS_DIR / "apple.png")).convert_alpha()
+        self.fruit_icon = pygame.transform.smoothscale(self._raw_fruit, (icon, icon))
 
     def load_items(self):
         available = self.available_voices()
@@ -206,7 +205,6 @@ class Game(VoiceQuizGame):
         pulse = (math.sin(now / 200) + 1) / 2 if not revealed else 0.0
         draw_speaker_icon(surface, (rect.centerx, rect.centery + 90),
                           self.CARD_SIZE * 0.28, self.SPEAKER_COLOR, pulse=pulse)
-
 
 if __name__ == "__main__":
     asyncio.run(Game().run())
