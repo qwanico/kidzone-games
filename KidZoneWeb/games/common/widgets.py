@@ -39,8 +39,13 @@ def draw_home_icon(surface, rect, color, hovered=False, radius=12):
     ])
 
 
-def draw_speaker_icon(surface, center, size, color):
-    """Speaker glyph with two sound arcs - the 'say it again' affordance."""
+def draw_speaker_icon(surface, center, size, color, pulse=0.0):
+    """Speaker glyph with two sound arcs - the 'say it again' affordance.
+
+    `pulse` (0..1) swells the icon slightly while a clip is playing; math_game
+    was the only game that had this, and it is harmless everywhere else.
+    """
+    size = size * (1.0 + pulse * 0.08)
     x, y = center
     body_w, body_h = size * 0.35, size * 0.5
     body_rect = pygame.Rect(0, 0, body_w, body_h)

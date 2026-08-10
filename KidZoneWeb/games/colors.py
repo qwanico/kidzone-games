@@ -10,6 +10,17 @@ try:
 except ImportError:
     platform = None
 
+try:
+    from .common import fx
+    from .common.audio import VoicePlayer
+    from .common.widgets import draw_home_icon, draw_speaker_icon
+except ImportError:  # standalone `python games/colors.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import fx
+    from common.audio import VoicePlayer
+    from common.widgets import draw_home_icon, draw_speaker_icon
+
 BASE_DIR = Path(__file__).parent / "colors_assets"
 VOICE_DIR = BASE_DIR / "voice_cache"
 SOUNDS_DIR = BASE_DIR / "sounds"
@@ -44,63 +55,6 @@ CONFETTI_COLORS = [
     (54, 162, 235), (153, 102, 255), (255, 159, 64),
 ]
 
-
-class Particle:
-    __slots__ = ("x0", "y0", "vx", "vy", "color", "size", "spawn", "life", "shape")
-
-    def __init__(self, x, y, vx, vy, color, size, spawn, life, shape):
-        self.x0 = x
-        self.y0 = y
-        self.vx = vx
-        self.vy = vy
-        self.color = color
-        self.size = size
-        self.spawn = spawn
-        self.life = life
-        self.shape = shape
-
-    def pos_at(self, now):
-        t = (now - self.spawn) / 1000.0
-        x = self.x0 + self.vx * t
-        y = self.y0 + self.vy * t + 0.5 * 650 * t * t
-        return x, y
-
-    def alive(self, now):
-        return now - self.spawn < self.life
-
-
-def spawn_confetti(center, now, count=18):
-    particles = []
-    for _ in range(count):
-        angle = random.uniform(-math.pi * 0.85, -math.pi * 0.15)
-        speed = random.uniform(160, 380)
-        vx = math.cos(angle) * speed
-        vy = math.sin(angle) * speed
-        color = random.choice(CONFETTI_COLORS)
-        size = random.randint(5, 9)
-        shape = random.choice(["circle", "square"])
-        particles.append(Particle(center[0], center[1], vx, vy, color, size, now, 900, shape))
-    return particles
-
-
-def draw_home_icon(surface, rect, color):
-    """Small house icon (triangle roof + rectangle body) on a rounded button."""
-    pygame.draw.rect(surface, color, rect, border_radius=12)
-    pygame.draw.rect(surface, (255, 255, 255), rect, width=2, border_radius=12)
-
-    cx, cy = rect.center
-    w, h = rect.width, rect.height
-
-    roof_half = w * 0.28
-    roof_top = (cx, cy - h * 0.26)
-    roof_left = (cx - roof_half, cy - h * 0.02)
-    roof_right = (cx + roof_half, cy - h * 0.02)
-    pygame.draw.polygon(surface, (255, 255, 255), [roof_top, roof_left, roof_right])
-
-    body_w, body_h = w * 0.34, h * 0.30
-    body_rect = pygame.Rect(0, 0, body_w, body_h)
-    body_rect.midtop = (cx, cy - h * 0.02)
-    pygame.draw.rect(surface, (255, 255, 255), body_rect)
 
 # Kid-friendly, clearly-saturated swatch RGBs for each color word.
 COLOR_RGB = {
@@ -193,37 +147,11 @@ class ColorButton(Button):
             _draw_cross(surface, rect.center, mark_size, (255, 255, 255))
 
 
-def draw_speaker_icon(surface, center, size, color):
-    x, y = center
-    body_w, body_h = size * 0.35, size * 0.5
-    body_rect = pygame.Rect(0, 0, body_w, body_h)
-    body_rect.center = (x - size * 0.15, y)
-    pygame.draw.rect(surface, color, body_rect, border_radius=6)
-
-    cone = [
-        (x - size * 0.15 - body_w / 2, y - size * 0.15),
-        (x + size * 0.05, y - size * 0.35),
-        (x + size * 0.05, y + size * 0.35),
-        (x - size * 0.15 - body_w / 2, y + size * 0.15),
-    ]
-    pygame.draw.polygon(surface, color, cone)
-
-    for i in range(1, 3):
-        radius = size * (0.18 + i * 0.14)
-        rect = pygame.Rect(0, 0, radius * 2, radius * 2)
-        rect.center = (x, y)
-        pygame.draw.arc(
-            surface, color, rect, -0.5, 0.5, width=5
-        )
-
-
 class Game:
     def __init__(self):
         pygame.init()
         pygame.mixer.init()
-        pygame.mixer.set_reserved(1)
-        self.voice_channel = pygame.mixer.Channel(0)
-        self.voice_cache = {}
+        self.voice = VoicePlayer(VOICE_DIR)
 
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
         if platform is not None and hasattr(platform, "window"):
@@ -293,21 +221,17 @@ class Game:
     def enter_pause(self):
         ticks = pygame.time.get_ticks()
         self._pause_remaining = (self.feedback_until - ticks) if self.feedback_until > ticks else None
-        self.voice_channel.pause()
+        self.voice.pause()
         self.state = STATE_PAUSED
 
     def resume_game(self):
         ticks = pygame.time.get_ticks()
         self.feedback_until = ticks + self._pause_remaining if self._pause_remaining else 0
-        self.voice_channel.unpause()
+        self.voice.unpause()
         self.state = STATE_PLAYING
 
     def speak(self, color):
-        path = str(VOICE_DIR / f"{color}.ogg")
-        if path not in self.voice_cache:
-            self.voice_cache[path] = pygame.mixer.Sound(path)
-        self.voice_channel.stop()
-        self.voice_channel.play(self.voice_cache[path])
+        self.voice.say(color)
 
     def new_round(self):
         choices = [c for c in self.colors if c != self.last_color] or self.colors
@@ -384,7 +308,7 @@ class Game:
                     self.streak += 1
                     self.feedback_text = "Great job!"
                     self.feedback_color = CORRECT_COLOR
-                    self.particles.extend(spawn_confetti(button.rect.center, now))
+                    self.particles.extend(fx.spawn_burst(button.rect.center, now, CONFETTI_COLORS))
                     if self.streak >= 3 and self.streak % 3 == 0:
                         self.milestone_text = f"{self.streak} in a row!"
                     else:
@@ -415,17 +339,7 @@ class Game:
             self.screen.blit(surf, (deco["x"] - r, deco["y"] - r + bob))
 
     def draw_particles(self):
-        for p in self.particles:
-            now = pygame.time.get_ticks()
-            x, y = p.pos_at(now)
-            t = (now - p.spawn) / p.life
-            alpha = max(0, int(255 * (1 - t)))
-            surf = pygame.Surface((p.size * 2, p.size * 2), pygame.SRCALPHA)
-            if p.shape == "circle":
-                pygame.draw.circle(surf, (*p.color, alpha), (p.size, p.size), p.size)
-            else:
-                pygame.draw.rect(surf, (*p.color, alpha), surf.get_rect())
-            self.screen.blit(surf, (x - p.size, y - p.size))
+        fx.draw_burst(self.screen, self.particles, pygame.time.get_ticks())
 
     def draw_milestone(self, text):
         banner = self.font_feedback.render(text, True, MILESTONE_GOLD)
@@ -547,7 +461,7 @@ class Game:
             clock.tick(60)
             await asyncio.sleep(0)
 
-        self.voice_channel.stop()
+        self.voice.stop()
 
 
 if __name__ == "__main__":

@@ -10,6 +10,15 @@ try:
 except ImportError:
     platform = None
 
+try:
+    from .common import fx
+    from .common.widgets import draw_home_icon
+except ImportError:  # standalone `python games/simon_pattern.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import fx
+    from common.widgets import draw_home_icon
+
 BASE_DIR = Path(__file__).parent / "simon_pattern_assets"
 SOUNDS_DIR = BASE_DIR / "sounds"
 
@@ -57,30 +66,6 @@ PHASE_SUCCESS = "success"
 PHASE_FAIL = "fail"
 
 
-class Particle:
-    __slots__ = ("x0", "y0", "vx", "vy", "color", "size", "spawn", "life", "shape")
-
-    def __init__(self, x, y, vx, vy, color, size, spawn, life, shape):
-        self.x0 = x
-        self.y0 = y
-        self.vx = vx
-        self.vy = vy
-        self.color = color
-        self.size = size
-        self.spawn = spawn
-        self.life = life
-        self.shape = shape
-
-    def pos_at(self, now):
-        t = (now - self.spawn) / 1000.0
-        x = self.x0 + self.vx * t
-        y = self.y0 + self.vy * t + 0.5 * 650 * t * t
-        return x, y
-
-    def alive(self, now):
-        return now - self.spawn < self.life
-
-
 def spawn_confetti(center, now, count=24):
     particles = []
     for _ in range(count):
@@ -91,7 +76,7 @@ def spawn_confetti(center, now, count=24):
         color = random.choice(CONFETTI_COLORS)
         size = random.randint(5, 9)
         shape = random.choice(["circle", "square"])
-        particles.append(Particle(center[0], center[1], vx, vy, color, size, now, 1000, shape))
+        particles.append(fx.Particle(center[0], center[1], vx, vy, color, size, now, 1000, shape))
     return particles
 
 
@@ -113,26 +98,6 @@ class Button:
         text_surf = font.render(self.label, True, (255, 255, 255))
         text_rect = text_surf.get_rect(center=draw_rect.center)
         surface.blit(text_surf, text_rect)
-
-
-def draw_home_icon(surface, rect, color):
-    """Small house icon (triangle roof + rectangle body) on a rounded button."""
-    pygame.draw.rect(surface, color, rect, border_radius=12)
-    pygame.draw.rect(surface, (255, 255, 255), rect, width=2, border_radius=12)
-
-    cx, cy = rect.center
-    w, h = rect.width, rect.height
-
-    roof_half = w * 0.28
-    roof_top = (cx, cy - h * 0.26)
-    roof_left = (cx - roof_half, cy - h * 0.02)
-    roof_right = (cx + roof_half, cy - h * 0.02)
-    pygame.draw.polygon(surface, (255, 255, 255), [roof_top, roof_left, roof_right])
-
-    body_w, body_h = w * 0.34, h * 0.30
-    body_rect = pygame.Rect(0, 0, body_w, body_h)
-    body_rect.midtop = (cx, cy - h * 0.02)
-    pygame.draw.rect(surface, (255, 255, 255), body_rect)
 
 
 class Panel:

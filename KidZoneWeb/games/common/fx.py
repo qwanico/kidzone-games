@@ -85,3 +85,59 @@ def draw_confetti(surface, pieces):
         pygame.draw.rect(piece, (*p["color"], alpha), (0, 0, size, size), border_radius=2)
         rotated = pygame.transform.rotate(piece, p["angle"])
         surface.blit(rotated, rotated.get_rect(center=(p["x"], p["y"])))
+
+
+# --- Analytic particles -------------------------------------------------
+# The other game family models confetti as a closed-form trajectory sampled
+# from its spawn time rather than integrating each frame. Both were in the
+# codebase; both are kept, because switching either family to the other's
+# model visibly changes how its celebration looks.
+
+class Particle:
+    __slots__ = ("x0", "y0", "vx", "vy", "color", "size", "spawn", "life", "shape")
+
+    def __init__(self, x, y, vx, vy, color, size, spawn, life, shape):
+        self.x0 = x
+        self.y0 = y
+        self.vx = vx
+        self.vy = vy
+        self.color = color
+        self.size = size
+        self.spawn = spawn
+        self.life = life
+        self.shape = shape
+
+    def pos_at(self, now):
+        t = (now - self.spawn) / 1000.0
+        return (self.x0 + self.vx * t,
+                self.y0 + self.vy * t + 0.5 * 650 * t * t)
+
+    def alive(self, now):
+        return now - self.spawn < self.life
+
+
+def spawn_burst(center, now, colors, count=18, life=900):
+    """Upward confetti fan from `center`, sampled analytically from `now`."""
+    particles = []
+    for _ in range(count):
+        angle = random.uniform(-math.pi * 0.85, -math.pi * 0.15)
+        speed = random.uniform(160, 380)
+        particles.append(Particle(
+            center[0], center[1],
+            math.cos(angle) * speed, math.sin(angle) * speed,
+            random.choice(colors), random.randint(5, 9), now, life,
+            random.choice(["circle", "square"]),
+        ))
+    return particles
+
+
+def draw_burst(surface, particles, now):
+    for p in particles:
+        x, y = p.pos_at(now)
+        alpha = max(0, int(255 * (1 - (now - p.spawn) / p.life)))
+        surf = pygame.Surface((p.size * 2, p.size * 2), pygame.SRCALPHA)
+        if p.shape == "circle":
+            pygame.draw.circle(surf, (*p.color, alpha), (p.size, p.size), p.size)
+        else:
+            pygame.draw.rect(surf, (*p.color, alpha), surf.get_rect())
+        surface.blit(surf, (x - p.size, y - p.size))
