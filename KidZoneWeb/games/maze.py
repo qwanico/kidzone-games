@@ -230,6 +230,10 @@ class Game:
         self.bump_shake_until = 0
         self.bump_offset = (0, 0)
         self.last_move = 0
+        # Touch steering: a finger held down keeps stepping toward itself,
+        # rate-limited by MOVE_REPEAT_MS so a child can't rocket across the maze.
+        self.touch_steering = False
+        self.last_touch_step = 0
         self.feedback_until = 0
         self.feedback_text = ""
         self.particles = []
@@ -347,8 +351,45 @@ class Game:
     def handle_playing_click(self, pos):
         if self.home_button.collidepoint(pos):
             self.quit_requested = True
-        elif self.pause_button.rect.collidepoint(pos):
+            return
+        if self.pause_button.rect.collidepoint(pos):
             self.enter_pause()
+            return
+        # Anything else in the play area steers. Without this the maze was
+        # keyboard-only, which made it unplayable on a tablet.
+        self.touch_steering = True
+        self.last_touch_step = 0
+        self.step_toward(pos)
+
+    def step_toward(self, pos, now=None):
+        """Move one cell toward `pos`.
+
+        Deliberately forgiving: the child taps the side of the player they
+        want to go, not an exact adjacent cell. Whichever axis the tap is
+        further along wins, so a sloppy diagonal tap still does something
+        sensible instead of nothing.
+        """
+        if self.won:
+            return
+        now = pygame.time.get_ticks() if now is None else now
+        if now - self.last_touch_step < MOVE_REPEAT_MS:
+            return
+
+        ox, oy = self.origin
+        cs = max(1, self.cell_size)
+        px, py = self.player
+        dx = pos[0] - (ox + px * cs + cs / 2)
+        dy = pos[1] - (oy + py * cs + cs / 2)
+
+        # Tapping the player itself is a no-op rather than a random lurch.
+        if abs(dx) < cs * 0.4 and abs(dy) < cs * 0.4:
+            return
+
+        self.last_touch_step = now
+        if abs(dx) > abs(dy):
+            self.try_move(1 if dx > 0 else -1, 0)
+        else:
+            self.try_move(0, 1 if dy > 0 else -1)
 
     def handle_key(self, key):
         moves = {
@@ -414,7 +455,7 @@ class Game:
             x += surf.get_width()
 
         subtitle_surf = self.font_subtitle.render(
-            "Use arrow keys or WASD to find the goal!", True, TEXT_COLOR
+            "Tap which way to go - or use the arrow keys!", True, TEXT_COLOR
         )
         subtitle_rect = subtitle_surf.get_rect(center=(WIDTH // 2, 320))
         self.screen.blit(subtitle_surf, subtitle_rect)
@@ -560,6 +601,13 @@ class Game:
                         self.handle_playing_click(event.pos)
                     elif self.state == STATE_PAUSED:
                         self.handle_pause_click(event.pos)
+                elif event.type == pygame.MOUSEMOTION and self.touch_steering:
+                    # Finger held down: keep stepping toward it, so a child can
+                    # drag a path instead of tapping once per cell.
+                    if self.state == STATE_PLAYING:
+                        self.step_toward(event.pos)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    self.touch_steering = False
 
             if self.state == STATE_PLAYING:
                 self.update()

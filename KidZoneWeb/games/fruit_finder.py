@@ -508,32 +508,37 @@ apply_volumes()
 
 # ---------------- PROGRESS (high scores, lifetime stats) ----------------
 
-PROGRESS_FILE = str(BASE_DIR / "progress.json")
+# Saved to real browser localStorage, not a file. The old progress.json lived
+# in the asset folder, which pygbag re-extracts from the shipped archive on
+# every page load - so scores never actually persisted, and the copy bundled
+# at build time shipped the developer's own high scores to every child.
+try:
+    from .common.storage import KeyValueStore
+except ImportError:  # standalone `python games/fruit_finder.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common.storage import KeyValueStore
+
+DEFAULT_PROGRESS = {
+    "high_scores": {},
+    "total_correct": 0,
+    "best_streak_ever": 0,
+    "items_found": [],
+}
+
+_store = KeyValueStore("kidzone_fruit_finder")
 
 
 def load_progress():
-
-    default = {
-        "high_scores": {},
-        "total_correct": 0,
-        "best_streak_ever": 0,
-        "items_found": []
-    }
-
-    try:
-        with open(PROGRESS_FILE) as f:
-            loaded = json.load(f)
-            default.update(loaded)
-            return default
-
-    except (FileNotFoundError, ValueError):
-        return default
+    loaded = _store.load(DEFAULT_PROGRESS)
+    # Defensive copies so callers can mutate without aliasing the defaults.
+    loaded["high_scores"] = dict(loaded.get("high_scores") or {})
+    loaded["items_found"] = list(loaded.get("items_found") or [])
+    return loaded
 
 
 def save_progress():
-
-    with open(PROGRESS_FILE, "w") as f:
-        json.dump(progress, f)
+    _store.save(progress)
 
 
 def get_high_score(for_mode, for_category):
