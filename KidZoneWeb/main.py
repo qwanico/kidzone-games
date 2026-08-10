@@ -14,6 +14,7 @@ except ImportError:
     platform = None
 
 from games.common import sfx
+from games.common import text
 
 BASE_DIR = Path(__file__).parent
 ICONS_DIR = BASE_DIR / "tile_icons"
@@ -1209,10 +1210,10 @@ async def main():
             title_size = int(clamp(58 * SCALE, 36, 60))
         subtitle_size = int(clamp(22 * SCALE, 16, 23))
         stat_pill_size = int(clamp(18 * SCALE, 15, 18))
-        name_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29)))
+        name_font = text.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29)))
         # Captions keep a readable size and wrap to the card width instead
         # of being shrunk to fit one hand-authored line break.
-        comment_font = pygame.font.Font(
+        comment_font = text.Font(
             FONTS_DIR / "Nunito-Regular.ttf", int(clamp(18 * SCALE, 15, 18))
         )
         _cap_pad = int(clamp(20 * SCALE, 14, 20))
@@ -1230,18 +1231,18 @@ async def main():
         )
         if _need > CARD_H:
             CARD_H = _need
-        gate_title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", 40)
-        settings_title_font = pygame.font.Font(
+        gate_title_font = text.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", 40)
+        settings_title_font = text.Font(
             FONTS_DIR / "Baloo2-ExtraBold.ttf", int(clamp(40 * SCALE, 28, 40))
         )
-        stat_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(22 * SCALE, 17, 22)))
-        badge_label_font = pygame.font.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 14, 16)))
-        button_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", 22)
+        stat_font = text.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(22 * SCALE, 17, 22)))
+        badge_label_font = text.Font(FONTS_DIR / "Nunito-Bold.ttf", int(clamp(15 * SCALE, 14, 16)))
+        button_font = text.Font(FONTS_DIR / "Baloo2-Bold.ttf", 22)
 
-        title_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", title_size)
-        subtitle_font = pygame.font.Font(FONTS_DIR / "Nunito-Regular.ttf", subtitle_size)
-        stat_pill_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", stat_pill_size)
-        tab_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(24 * SCALE, 18, 25)))
+        title_font = text.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", title_size)
+        subtitle_font = text.Font(FONTS_DIR / "Nunito-Regular.ttf", subtitle_size)
+        stat_pill_font = text.Font(FONTS_DIR / "Baloo2-Bold.ttf", stat_pill_size)
+        tab_font = text.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(24 * SCALE, 18, 25)))
 
         cards = layout_cards(active_category)
         max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP)
@@ -1298,7 +1299,7 @@ async def main():
         side_reserve = gear_radius * 2 + CARD_MARGIN + 96
         available_center_w = max(150, WIDTH - side_reserve * 2)
         for candidate_size in range(title_size, 21, -2):
-            candidate_font = pygame.font.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", candidate_size)
+            candidate_font = text.Font(FONTS_DIR / "Baloo2-ExtraBold.ttf", candidate_size)
             candidate_w = candidate_font.size("Kid Zone")[0]
             if mascot_size + title_gap + candidate_w <= available_center_w or candidate_size <= 22:
                 title_font = candidate_font

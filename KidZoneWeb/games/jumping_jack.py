@@ -14,11 +14,13 @@ except ImportError:
 try:
     from .common import sfx
     from .common import display
+    from .common import text
 except ImportError:  # standalone `python games/jumping_jack.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import sfx
     from common import display
+    from common import text
 
 WIDTH, HEIGHT = 900, 600
 BG_TOP = (255, 200, 150)
@@ -307,10 +309,10 @@ async def run():
     clock = pygame.time.Clock()
     frame = pygame.Surface((WIDTH, HEIGHT))
 
-    title_font = pygame.font.SysFont(None, 56, bold=True)
-    subtitle_font = pygame.font.SysFont(None, 28)
-    hud_font = pygame.font.SysFont(None, 40, bold=True)
-    big_font = pygame.font.SysFont(None, 64, bold=True)
+    title_font = text.SysFont(None, 56, bold=True)
+    subtitle_font = text.SysFont(None, 28)
+    hud_font = text.SysFont(None, 40, bold=True)
+    big_font = text.SysFont(None, 64, bold=True)
 
     best_score = 0
 

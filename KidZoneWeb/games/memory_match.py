@@ -14,11 +14,13 @@ except ImportError:
 try:
     from .common import sfx
     from .common import display
+    from .common import text
 except ImportError:  # standalone `python games/memory_match.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import sfx
     from common import display
+    from common import text
 
 WIDTH, HEIGHT = 900, 750
 BG_COLOR = (245, 240, 250)
@@ -325,11 +327,11 @@ async def run():
     pygame.display.set_caption("Memory Match")
     clock = pygame.time.Clock()
 
-    title_font = pygame.font.SysFont(None, 64, bold=True)
-    subtitle_font = pygame.font.SysFont(None, 30)
-    hud_font = pygame.font.SysFont(None, 40, bold=True)
-    big_font = pygame.font.SysFont(None, 64, bold=True)
-    milestone_font = pygame.font.SysFont(None, 38, bold=True)
+    title_font = text.SysFont(None, 64, bold=True)
+    subtitle_font = text.SysFont(None, 30)
+    hud_font = text.SysFont(None, 40, bold=True)
+    big_font = text.SysFont(None, 64, bold=True)
+    milestone_font = text.SysFont(None, 38, bold=True)
 
     particles = []
     shockwaves = []

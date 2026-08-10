@@ -12,10 +12,12 @@ except ImportError:
 
 try:
     from .common import display
+    from .common import text
 except ImportError:  # standalone `python games/planets.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import display
+    from common import text
 
 BASE_DIR = Path(__file__).parent / "planets_assets"
 SOUNDS_DIR = BASE_DIR / "sounds"
@@ -227,12 +229,12 @@ class Game:
                 pass
         pygame.display.set_caption("Planets")
 
-        self.font_title = pygame.font.SysFont("arial", 64, bold=True)
-        self.font_subtitle = pygame.font.SysFont("arial", 24)
-        self.font_word = pygame.font.SysFont("arial", 30, bold=True)
-        self.font_label = pygame.font.SysFont("arial", 18, bold=True)
-        self.font_small_label = pygame.font.SysFont("arial", 16, bold=True)
-        self.font_score = pygame.font.SysFont("arial", 24, bold=True)
+        self.font_title = text.SysFont("arial", 64, bold=True)
+        self.font_subtitle = text.SysFont("arial", 24)
+        self.font_word = text.SysFont("arial", 30, bold=True)
+        self.font_label = text.SysFont("arial", 18, bold=True)
+        self.font_small_label = text.SysFont("arial", 16, bold=True)
+        self.font_score = text.SysFont("arial", 24, bold=True)
 
         # --- decorative animated space background ---
         self.stars = build_stars()

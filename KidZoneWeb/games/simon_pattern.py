@@ -14,12 +14,14 @@ try:
     from .common import fx
     from .common.widgets import draw_home_icon
     from .common import display
+    from .common import text
 except ImportError:  # standalone `python games/simon_pattern.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import fx
     from common.widgets import draw_home_icon
     from common import display
+    from common import text
 
 BASE_DIR = Path(__file__).parent / "simon_pattern_assets"
 SOUNDS_DIR = BASE_DIR / "sounds"
@@ -160,12 +162,12 @@ class Game:
                 pass
         pygame.display.set_caption("Simon Pattern")
 
-        self.font_title = pygame.font.SysFont("arial", 64, bold=True)
-        self.font_subtitle = pygame.font.SysFont("arial", 26)
-        self.font_word = pygame.font.SysFont("arial", 32, bold=True)
-        self.font_icon = pygame.font.SysFont("arial", 24, bold=True)
-        self.font_score = pygame.font.SysFont("arial", 28, bold=True)
-        self.font_feedback = pygame.font.SysFont("arial", 44, bold=True)
+        self.font_title = text.SysFont("arial", 64, bold=True)
+        self.font_subtitle = text.SysFont("arial", 26)
+        self.font_word = text.SysFont("arial", 32, bold=True)
+        self.font_icon = text.SysFont("arial", 24, bold=True)
+        self.font_score = text.SysFont("arial", 28, bold=True)
+        self.font_feedback = text.SysFont("arial", 44, bold=True)
 
         self.wrong_sound = pygame.mixer.Sound(str(SOUNDS_DIR / "wrong.ogg"))
 

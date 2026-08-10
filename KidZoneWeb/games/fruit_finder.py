@@ -17,6 +17,15 @@ try:
 except ImportError:
     platform = None
 
+# Imported up here rather than with the other common imports further down:
+# this module builds its fonts at import time, well before that block runs.
+try:
+    from .common import text
+except ImportError:  # standalone `python games/fruit_finder.py`
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from common import text
+
 pygame.init()
 
 BASE_DIR = Path(__file__).parent / "fruit_finder_assets"
@@ -369,27 +378,27 @@ def speak_callout():
 
 # ---------------- FONTS ----------------
 
-title_font = pygame.font.Font(
+title_font = text.Font(
     None,
     65
 )
 
-score_font = pygame.font.Font(
+score_font = text.Font(
     None,
     45
 )
 
-menu_title_font = pygame.font.Font(
+menu_title_font = text.Font(
     None,
     100
 )
 
-button_font = pygame.font.Font(
+button_font = text.Font(
     None,
     55
 )
 
-milestone_font = pygame.font.Font(
+milestone_font = text.Font(
     None,
     70
 )
@@ -1335,7 +1344,7 @@ new_best_this_run = False
 
 # ---------------- SMALL FONT (for compact buttons) ----------------
 
-small_font = pygame.font.Font(
+small_font = text.Font(
     None,
     32
 )

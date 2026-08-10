@@ -14,11 +14,13 @@ except ImportError:
 try:
     from .common import sfx
     from .common import display
+    from .common import text
 except ImportError:  # standalone `python games/bug_squasher.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import sfx
     from common import display
+    from common import text
 
 WIDTH, HEIGHT = 900, 700
 BG_COLOR = (225, 235, 200)
@@ -134,7 +136,7 @@ def draw_particles(screen, particles):
 
 
 def draw_milestone(screen, font, text, alpha):
-    surf = font.render(text, True, (255, 255, 255))
+    surf = font.render_copy(text, True, (255, 255, 255))
     rect = surf.get_rect(center=(WIDTH // 2, 185))
     bg = rect.inflate(44, 24)
     panel = pygame.Surface(bg.size, pygame.SRCALPHA)
@@ -258,11 +260,11 @@ async def run():
     pygame.display.set_caption("Bug Squasher")
     clock = pygame.time.Clock()
 
-    title_font = pygame.font.SysFont(None, 64, bold=True)
-    subtitle_font = pygame.font.SysFont(None, 30)
-    hud_font = pygame.font.SysFont(None, 40, bold=True)
-    big_font = pygame.font.SysFont(None, 72, bold=True)
-    milestone_font = pygame.font.SysFont(None, 46, bold=True)
+    title_font = text.SysFont(None, 64, bold=True)
+    subtitle_font = text.SysFont(None, 30)
+    hud_font = text.SysFont(None, 40, bold=True)
+    big_font = text.SysFont(None, 72, bold=True)
+    milestone_font = text.SysFont(None, 46, bold=True)
 
     def new_game():
         return [], 0, pygame.time.get_ticks() + ROUND_SECONDS * 1000, pygame.time.get_ticks()

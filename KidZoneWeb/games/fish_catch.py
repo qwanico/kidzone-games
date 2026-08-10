@@ -14,11 +14,13 @@ except ImportError:
 try:
     from .common import sfx
     from .common import display
+    from .common import text
 except ImportError:  # standalone `python games/fish_catch.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
     from common import sfx
     from common import display
+    from common import text
 
 WIDTH, HEIGHT = 900, 700
 BG_TOP = (30, 90, 165)
@@ -230,7 +232,7 @@ def draw_poptexts(screen, font, poptexts):
         t = p["age"] / p["life"]
         alpha = max(0, int(255 * (1 - t)))
         scale = 1.0 + 0.5 * min(1.0, p["age"] / 120.0)
-        surf = font.render(p["text"], True, p["color"])
+        surf = font.render_copy(p["text"], True, p["color"])
         w, h = surf.get_size()
         if abs(scale - 1.0) > 0.01:
             surf = pygame.transform.smoothscale(surf, (max(1, int(w * scale)), max(1, int(h * scale))))
@@ -239,7 +241,7 @@ def draw_poptexts(screen, font, poptexts):
 
 
 def draw_milestone(screen, font, text, alpha):
-    surf = font.render(text, True, (255, 255, 255))
+    surf = font.render_copy(text, True, (255, 255, 255))
     rect = surf.get_rect(center=(WIDTH // 2, 185))
     bg = rect.inflate(44, 24)
     panel = pygame.Surface(bg.size, pygame.SRCALPHA)
@@ -335,12 +337,12 @@ async def run():
     clock = pygame.time.Clock()
     frame = pygame.Surface((WIDTH, HEIGHT))
 
-    title_font = pygame.font.SysFont(None, 64, bold=True)
-    subtitle_font = pygame.font.SysFont(None, 30)
-    hud_font = pygame.font.SysFont(None, 40, bold=True)
-    big_font = pygame.font.SysFont(None, 72, bold=True)
-    milestone_font = pygame.font.SysFont(None, 46, bold=True)
-    poptext_font = pygame.font.SysFont(None, 34, bold=True)
+    title_font = text.SysFont(None, 64, bold=True)
+    subtitle_font = text.SysFont(None, 30)
+    hud_font = text.SysFont(None, 40, bold=True)
+    big_font = text.SysFont(None, 72, bold=True)
+    milestone_font = text.SysFont(None, 46, bold=True)
+    poptext_font = text.SysFont(None, 34, bold=True)
 
     def new_game():
         return [], 0, START_LIVES, pygame.time.get_ticks() + random.randint(

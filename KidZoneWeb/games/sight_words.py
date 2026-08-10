@@ -15,6 +15,7 @@ try:
     from .common.audio import VoicePlayer, available_voices
     from .common.widgets import AnswerButton, draw_home_icon, draw_speaker_icon
     from .common import display
+    from .common import text
 except ImportError:  # standalone `python games/sight_words.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
@@ -22,6 +23,7 @@ except ImportError:  # standalone `python games/sight_words.py`
     from common.audio import VoicePlayer, available_voices
     from common.widgets import AnswerButton, draw_home_icon, draw_speaker_icon
     from common import display
+    from common import text
 
 BASE_DIR = Path(__file__).parent / "sight_words_assets"
 VOICE_DIR = BASE_DIR / "voice_cache"
@@ -95,14 +97,14 @@ class Game:
                 pass
         pygame.display.set_caption("Sight Words")
 
-        self.font_word = pygame.font.SysFont("arial", 48, bold=True)
-        self.font_score = pygame.font.SysFont("arial", 28, bold=True)
-        self.font_feedback = pygame.font.SysFont("arial", 50, bold=True)
-        self.font_title = pygame.font.SysFont("arial", 68, bold=True)
-        self.font_subtitle = pygame.font.SysFont("arial", 26)
-        self.font_icon = pygame.font.SysFont("arial", 24, bold=True)
-        self.font_reveal = pygame.font.SysFont("arial", 90, bold=True)
-        self.font_milestone = pygame.font.SysFont("arial", 40, bold=True)
+        self.font_word = text.SysFont("arial", 48, bold=True)
+        self.font_score = text.SysFont("arial", 28, bold=True)
+        self.font_feedback = text.SysFont("arial", 50, bold=True)
+        self.font_title = text.SysFont("arial", 68, bold=True)
+        self.font_subtitle = text.SysFont("arial", 26)
+        self.font_icon = text.SysFont("arial", 24, bold=True)
+        self.font_reveal = text.SysFont("arial", 90, bold=True)
+        self.font_milestone = text.SysFont("arial", 40, bold=True)
 
         self.words = load_words()
         if len(self.words) < 2:

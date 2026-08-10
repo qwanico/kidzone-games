@@ -16,6 +16,7 @@ try:
     from .common.audio import VoicePlayer, available_voices
     from .common.widgets import AnswerButton, draw_home_icon
     from .common import display
+    from .common import text
 except ImportError:  # standalone `python games/feelings.py`
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
@@ -23,6 +24,7 @@ except ImportError:  # standalone `python games/feelings.py`
     from common.audio import VoicePlayer, available_voices
     from common.widgets import AnswerButton, draw_home_icon
     from common import display
+    from common import text
 
 BASE_DIR = Path(__file__).parent / "feelings_assets"
 VOICE_DIR = BASE_DIR / "voice_cache"
@@ -140,13 +142,13 @@ class Game:
                 pass
         pygame.display.set_caption("Feelings")
 
-        self.font_word = pygame.font.SysFont("arial", 42, bold=True)
-        self.font_score = pygame.font.SysFont("arial", 28, bold=True)
-        self.font_feedback = pygame.font.SysFont("arial", 50, bold=True)
-        self.font_title = pygame.font.SysFont("arial", 68, bold=True)
-        self.font_subtitle = pygame.font.SysFont("arial", 26)
-        self.font_icon = pygame.font.SysFont("arial", 24, bold=True)
-        self.font_milestone = pygame.font.SysFont("arial", 40, bold=True)
+        self.font_word = text.SysFont("arial", 42, bold=True)
+        self.font_score = text.SysFont("arial", 28, bold=True)
+        self.font_feedback = text.SysFont("arial", 50, bold=True)
+        self.font_title = text.SysFont("arial", 68, bold=True)
+        self.font_subtitle = text.SysFont("arial", 26)
+        self.font_icon = text.SysFont("arial", 24, bold=True)
+        self.font_milestone = text.SysFont("arial", 40, bold=True)
 
         self.feelings = load_feelings()
         if len(self.feelings) < 2:
