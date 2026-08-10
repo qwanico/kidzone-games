@@ -36,6 +36,7 @@ SCROLL_SPEED = 60
 CARD_RADIUS = 26
 SCALE = 1.0
 IS_NARROW = False
+IS_SHORT = False
 
 # Fixed header (title/streak/tabs/featured) stays put; only the card grid
 # below it scrolls, so switching categories always lands on a stable,
@@ -90,12 +91,21 @@ def apply_responsive_layout(width, height):
     global WIDTH, HEIGHT, COLS, CARD_W, CARD_H, CARD_GAP, CARD_MARGIN
     global IMAGE_SIZE, CARD_RADIUS, SCALE, IS_NARROW, HEADER_Y
     global GRID_TOP, TAB_BAR_TOP, TAB_HEIGHT, TAB_PAD_X, TAB_GAP
-    global FEATURED_TOP, FEATURED_H, SUBTITLE_Y, STATS_Y
+    global FEATURED_TOP, FEATURED_H, SUBTITLE_Y, STATS_Y, IS_SHORT
 
     WIDTH = clamp(width, 360, 1600)
-    HEIGHT = clamp(height, 480, 1300)
+    # Keep the logical surface equal to the real viewport wherever possible.
+    # Clamping the height *up* (e.g. a 390px-tall rotated phone to 400) makes
+    # pygame.SCALED letterbox/scale the surface, and in that scaled state
+    # drag-to-scroll stopped working in the browser while the wheel still
+    # did - so a rotated phone could not scroll the grid at all.
+    HEIGHT = clamp(height, 320, 1300)
     IS_NARROW = WIDTH < 760
     SCALE = clamp(WIDTH / 1000, 0.62, 1.2)
+    # A rotated phone is wide but very short: the full-height header stack
+    # (title + subtitle + pills + tabs + featured banner) would eat ~75% of
+    # the screen and leave the scrollable grid a thin unusable strip.
+    IS_SHORT = HEIGHT < 620
 
     COLS = 2 if IS_NARROW else 3
     CARD_MARGIN = 22 if IS_NARROW else 40
@@ -113,8 +123,12 @@ def apply_responsive_layout(width, height):
     CARD_RADIUS = clamp(int(30 * SCALE), 18, 30)
     IMAGE_SIZE = clamp(int(CARD_W * 0.4), 56, 120)
 
-    HEADER_Y = int(clamp(60 * SCALE, 40, 60))
-    TAB_HEIGHT = int(clamp(58 * SCALE, 50, 58))
+    if IS_SHORT:
+        HEADER_Y = int(clamp(38 * SCALE, 30, 42))
+        TAB_HEIGHT = int(clamp(46 * SCALE, 40, 50))
+    else:
+        HEADER_Y = int(clamp(60 * SCALE, 40, 60))
+        TAB_HEIGHT = int(clamp(58 * SCALE, 50, 58))
     TAB_PAD_X = int(clamp(20 * SCALE, 14, 20))
     TAB_GAP = int(clamp(14 * SCALE, 10, 14))
 
@@ -123,13 +137,20 @@ def apply_responsive_layout(width, height):
     # so nothing else needs to (re)derive these same offsets and risk
     # drifting out of sync with them (that drift is exactly what caused
     # the subtitle and stats row to previously overlap).
-    SUBTITLE_Y = HEADER_Y + int(clamp(40 * SCALE, 32, 40))
-    STATS_Y = SUBTITLE_Y + int(clamp(34 * SCALE, 26, 34))
-
-    TAB_BAR_TOP = STATS_Y + int(clamp(26 * SCALE, 20, 26))
-    FEATURED_TOP = TAB_BAR_TOP + TAB_HEIGHT + int(clamp(18 * SCALE, 14, 18))
-    FEATURED_H = int(clamp(158 * SCALE, 128, 158))
-    GRID_TOP = FEATURED_TOP + FEATURED_H + int(clamp(22 * SCALE, 16, 22))
+    if IS_SHORT:
+        SUBTITLE_Y = HEADER_Y + int(clamp(26 * SCALE, 21, 28))
+        STATS_Y = SUBTITLE_Y + int(clamp(24 * SCALE, 19, 26))
+        TAB_BAR_TOP = STATS_Y + int(clamp(18 * SCALE, 14, 20))
+        FEATURED_TOP = TAB_BAR_TOP + TAB_HEIGHT + int(clamp(12 * SCALE, 9, 14))
+        FEATURED_H = int(clamp(96 * SCALE, 80, 104))
+        GRID_TOP = FEATURED_TOP + FEATURED_H + int(clamp(14 * SCALE, 11, 16))
+    else:
+        SUBTITLE_Y = HEADER_Y + int(clamp(40 * SCALE, 32, 40))
+        STATS_Y = SUBTITLE_Y + int(clamp(34 * SCALE, 26, 34))
+        TAB_BAR_TOP = STATS_Y + int(clamp(26 * SCALE, 20, 26))
+        FEATURED_TOP = TAB_BAR_TOP + TAB_HEIGHT + int(clamp(18 * SCALE, 14, 18))
+        FEATURED_H = int(clamp(158 * SCALE, 128, 158))
+        GRID_TOP = FEATURED_TOP + FEATURED_H + int(clamp(22 * SCALE, 16, 22))
 
 # ---------------------------------------------------------------------------
 # Design tokens - warm cream "felt-board" palette (matches the approved
@@ -907,12 +928,16 @@ def draw_featured_card(surface, rect, game, fonts, play_hovered):
     desc_line = game["comment"].replace("\n", " ")
     desc_font = fonts["featured_desc"]
     desc_surf = desc_font.render(desc_line, True, PAPER_COLOR)
-    if desc_surf.get_width() > text_right_limit - text_x and text_right_limit > text_x:
-        # narrow layout: drop the description rather than clip it, the
-        # eyebrow + title + PLAY NOW button already carry the message.
-        pass
-    else:
-        surface.blit(desc_surf, (text_x, title_y + title_surf.get_height() + 4))
+    desc_y = title_y + title_surf.get_height() + 4
+    too_wide = desc_surf.get_width() > text_right_limit - text_x and text_right_limit > text_x
+    # The short/landscape banner is not tall enough for a third line, and
+    # without this check the description spilled out below the card onto
+    # the game grid underneath it.
+    too_tall = desc_y + desc_surf.get_height() > rect.bottom - pad
+    if not (too_wide or too_tall):
+        # otherwise drop it rather than clip it - the eyebrow + title +
+        # PLAY NOW button already carry the message.
+        surface.blit(desc_surf, (text_x, desc_y))
 
     draw_button(
         surface, play_rect, "PLAY NOW", fonts["featured_btn"],
@@ -1183,6 +1208,11 @@ async def main():
     confirm_reset = False
     running = True
     last_viewport_check = 0
+    # Scroll offsets persist across a rebuild (clamped to the new content
+    # height below) so a rotation doesn't fling the child back to the top.
+    scroll = 0
+    settings_scroll = 0
+    pending_viewport = None
 
     while running:
         # Everything inside is derived from the viewport captured here, so a
@@ -1204,7 +1234,12 @@ async def main():
         clock = pygame.time.Clock()
         load_images()
 
-        title_size = int(clamp(58 * SCALE, 36, 60))
+        # A rotated phone gets a smaller wordmark: the full-size one would
+        # descend into the subtitle/pill row of the compact header.
+        if IS_SHORT:
+            title_size = int(clamp(34 * SCALE, 26, 40))
+        else:
+            title_size = int(clamp(58 * SCALE, 36, 60))
         subtitle_size = int(clamp(22 * SCALE, 16, 23))
         stat_pill_size = int(clamp(18 * SCALE, 15, 18))
         name_font = pygame.font.Font(FONTS_DIR / "Baloo2-Bold.ttf", int(clamp(28 * SCALE, 20, 29)))
@@ -1230,7 +1265,7 @@ async def main():
 
         cards = layout_cards(active_category)
         max_scroll = max(0, content_height(cards) - (HEIGHT - GRID_TOP))
-        scroll = 0
+        scroll = max(0, min(scroll, max_scroll))
 
         # Today's Adventure: an existing game (Find The Food), not an invented
         # placeholder - keeps a single, obvious starting point for a child.
@@ -1281,7 +1316,7 @@ async def main():
         # (or the arcade-nav icon on the left) on a narrow phone width - a
         # fixed font size that was fine at 1000px wide isn't guaranteed to be
         # safe at 380px wide.
-        mascot_size = int(clamp(104 * SCALE, 68, 104))
+        mascot_size = int(clamp(60 * SCALE, 44, 66) if IS_SHORT else clamp(104 * SCALE, 68, 104))
         title_gap = int(clamp(18 * SCALE, 10, 18))
         side_reserve = gear_radius * 2 + CARD_MARGIN + 96
         available_center_w = max(150, WIDTH - side_reserve * 2)
@@ -1412,7 +1447,7 @@ async def main():
             + int(clamp(16 * SCALE, 12, 20))
         )
         settings_max_scroll = max(0, settings_content_h - SETTINGS_BAND_H)
-        settings_scroll = 0
+        settings_scroll = max(0, min(settings_scroll, settings_max_scroll))
         settings_dragging = False
         settings_drag_start_y = 0
         settings_drag_scroll_start = 0
@@ -1446,22 +1481,6 @@ async def main():
                             state = STATE_GATE
                         elif nav_rect.collidepoint(event.pos):
                             go_to_arcade()
-                        elif featured_rect.collidepoint(event.pos):
-                            await press_feedback(featured_rect, featured_game["hover"])
-                            record_game_launch(progress, featured_game["name"])
-                            try:
-                                await launch_game(featured_game)
-                            except Exception as exc:
-                                # A crashing game drops the child back to the
-                                # hub instead of taking the whole app down.
-                                print(f"Game '{featured_game['name']}' crashed: {exc!r}")
-                            finally:
-                                screen = pygame.display.set_mode(
-                                    (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE
-                                )
-                                resize_window()
-                                pygame.display.set_caption("Kid Zone")
-                                load_images()
                         else:
                             clicked_tab = False
                             for cat, rect in zip(CATEGORY_ORDER, tab_rects):
@@ -1480,7 +1499,14 @@ async def main():
                                         )
                                     break
 
-                            if not clicked_tab and event.pos[1] >= GRID_TOP:
+                            # Drag can start anywhere below the tab bar, not
+                            # just below GRID_TOP. On a rotated phone the
+                            # header + featured banner cover most of the
+                            # screen, so restricting it to the grid left only
+                            # a thin strip that responded to a scroll swipe.
+                            # A tap that doesn't move is still resolved as a
+                            # click on release (featured card or game card).
+                            if not clicked_tab and event.pos[1] >= TAB_BAR_TOP + TAB_HEIGHT:
                                 dragging = True
                                 drag_start_y = event.pos[1]
                                 drag_scroll_start = scroll
@@ -1491,6 +1517,28 @@ async def main():
                         scroll = max(0, min(drag_scroll_start - dy, max_scroll))
                     elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                         if dragging and drag_moved < DRAG_CLICK_THRESHOLD:
+                            if featured_rect.collidepoint(event.pos):
+                                # Resolved on release, not press, so a scroll
+                                # swipe that starts on the banner scrolls
+                                # instead of launching the game.
+                                await press_feedback(featured_rect, featured_game["hover"])
+                                record_game_launch(progress, featured_game["name"])
+                                try:
+                                    await launch_game(featured_game)
+                                except Exception as exc:
+                                    # A crashing game drops the child back to
+                                    # the hub instead of killing the app.
+                                    print(f"Game '{featured_game['name']}' crashed: {exc!r}")
+                                finally:
+                                    screen = pygame.display.set_mode(
+                                        (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE
+                                    )
+                                    resize_window()
+                                    pygame.display.set_caption("Kid Zone")
+                                    load_images()
+                                dragging = False
+                                continue
+
                             tap_pos = (event.pos[0], event.pos[1] - GRID_TOP + scroll)
                             for card in cards:
                                 if card.is_hovered(tap_pos):
@@ -1579,10 +1627,15 @@ async def main():
                 )
                 draw_sunny(screen, mascot_center, mascot_size, ticks)
 
-                subtitle_surf = subtitle_font.render(
-                    "Adventure Starts Here!", True, SUBTITLE_COLOR
-                )
-                screen.blit(subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, SUBTITLE_Y)))
+                if not IS_SHORT:
+                    # Dropped on a rotated phone: vertical space there is
+                    # better spent on the game grid than on a tagline.
+                    subtitle_surf = subtitle_font.render(
+                        "Adventure Starts Here!", True, SUBTITLE_COLOR
+                    )
+                    screen.blit(
+                        subtitle_surf, subtitle_surf.get_rect(center=(WIDTH // 2, SUBTITLE_Y))
+                    )
 
                 # Compact progress area - reuses the same progress fields the
                 # achievements screen already tracks (games explored / total
@@ -1841,11 +1894,27 @@ async def main():
             # Poll the real viewport a few times a second: a phone rotating
             # or a browser window resizing has to re-derive the whole layout,
             # and pygbag does not reliably raise VIDEORESIZE for it.
-            if not needs_rebuild and ticks - last_viewport_check > 250:
+            if (
+                not needs_rebuild
+                and not dragging
+                and not settings_dragging
+                and ticks - last_viewport_check > 300
+            ):
                 last_viewport_check = ticks
                 vw, vh = get_viewport_size(built_viewport)
-                if abs(vw - built_viewport[0]) > 8 or abs(vh - built_viewport[1]) > 8:
-                    needs_rebuild = True
+                # Mobile browsers change innerHeight by ~60-100px just from
+                # the URL bar hiding/showing as you swipe. Treating that as a
+                # resize rebuilt the layout mid-scroll, which read to the user
+                # as scrolling being dead. Only a width change or a large
+                # height change is a real rotation, it must persist across two
+                # polls, and never mid-drag.
+                if abs(vw - built_viewport[0]) > 8 or abs(vh - built_viewport[1]) > 140:
+                    if pending_viewport == (vw, vh):
+                        needs_rebuild = True
+                    else:
+                        pending_viewport = (vw, vh)
+                else:
+                    pending_viewport = None
 
             pygame.display.flip()
             clock.tick(60)
