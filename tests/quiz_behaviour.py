@@ -31,7 +31,8 @@ from games.common import display  # noqa: E402
 
 # Portrait phone, the same phone rotated, a tablet, and the old fixed design
 # size. The first two are what the fixed 900x700 canvas used to letterbox.
-VIEWPORTS = [(390, 844), (844, 390), (820, 1180), (900, 700)]
+# The last is the extreme the viewport clamps still allow.
+VIEWPORTS = [(390, 844), (844, 390), (820, 1180), (900, 700), (1600, 320)]
 
 QUIZ_GAMES = [
     "games.colors", "games.counting", "games.feelings", "games.letters",
@@ -52,6 +53,10 @@ def check_geometry(results, game, where):
         "card": game.card_rect,
         "home": game.home_button,
         "pause": game.pause_button.rect,
+        # Fraction-placed, so they clip at aspect ratios nobody hand-checked.
+        "start": game.start_button.rect,
+        "resume": game.resume_button.rect,
+        "quit": game.quit_button.rect,
         **{f"button{i}": b.rect for i, b in enumerate(game.buttons)},
     }
     for name, rect in rects.items():
@@ -89,6 +94,14 @@ def check_geometry(results, game, where):
         frame = next(iter(animations.values())).current()
         check(results, f"{where}: animation frame fits the card",
               frame.get_width() <= card.width and frame.get_height() <= card.height)
+
+    for i, button in enumerate(game.buttons):
+        for attr, game_attr in (("fruit_icon", "fruit_icon"),
+                                ("number_font", "font_number")):
+            captured = getattr(button, attr, None)
+            if captured is not None:
+                check(results, f"{where}: button{i} {attr} is current",
+                      captured is getattr(game, game_attr, None))
 
     icon = getattr(game, "fruit_icon", None)
     if icon is not None and game.buttons:
@@ -226,12 +239,52 @@ def exercise_viewports(module_name):
     return results
 
 
+def exercise_debounce():
+    """The rotation debounce in display, which every game depends on and
+    nothing else here executes: it only runs for real inside a browser.
+
+    Two rules, both paid for in bugs: a change must hold across two polls
+    (mobile browsers report a transient size mid-rotation), and a height-only
+    change under 140px is the URL bar hiding on scroll, not a rotation.
+    """
+    results = []
+    display.set_viewport_override((390, 844))
+    display.reset()                                  # establish the baseline
+
+    display.set_viewport_override((844, 390))
+    check(results, "a change is not acted on immediately",
+          display._confirmed_change() is None)
+    check(results, "a change confirmed by a second poll is reported",
+          display._confirmed_change() == (844, 390))
+
+    display.set_viewport_override((390, 844))
+    display.reset()
+    display.set_viewport_override((390, 750))        # URL bar, not a rotation
+    check(results, "the URL bar hiding is ignored",
+          display._confirmed_change() is None
+          and display._confirmed_change() is None)
+
+    display.set_viewport_override(None)
+    display.reset()
+    return results
+
+
 def main():
     targets = sys.argv[1:] or QUIZ_GAMES
     pygame.init()
     pygame.display.set_mode((900, 700))
 
     failed = []
+
+    debounce = exercise_debounce()
+    bad = [label for label, ok in debounce if not ok]
+    print(f"{'display debounce':24s} {len(debounce) - len(bad)}/{len(debounce)} "
+          f"{'ok' if not bad else 'FAILED'}")
+    for label in bad:
+        print(f"    FAIL: {label}")
+    if bad:
+        failed.append("display debounce")
+
     for name in targets:
         try:
             results = exercise(name) + exercise_viewports(name)

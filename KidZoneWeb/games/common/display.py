@@ -11,13 +11,22 @@ calling pygbag's window_resize() fixes the canvas *box* but not SDL's scale,
 and when both ran the JS call landed after set_mode() and undid it, leaving
 the game zoomed again. The Python side owns this.
 
-Usage, once per frame after presenting:
+Two forms, once per frame after presenting. A game with a fixed design size
+keeps it and only rebuilds the presentation:
 
     surface = display.maintain(WIDTH, HEIGHT)
     if surface is not None:
         screen = surface          # or self.screen = surface
 
-Games keep their fixed logical size; only the presentation is rebuilt.
+A game that lays itself out from the real viewport needs the new size back,
+so it can re-run that layout (see games/common/quiz.py):
+
+    surface, size = display.maintain_responsive()
+    if surface is not None:
+        self.screen = surface
+        self.layout(*size)
+
+Both share one debounce, so they cannot drift apart.
 """
 
 import pygame
@@ -36,11 +45,14 @@ def set_viewport_override(size):
     """Pretend the browser viewport is `size` (or None to stop pretending).
 
     Only for tests: responsive layout is the one thing that cannot be
-    exercised headlessly without it, since there is no browser to ask."""
-    global _override, _last_viewport, _pending
+    exercised headlessly without it, since there is no browser to ask.
+
+    Deliberately leaves the debounce state alone, so that changing the
+    override reads as a viewport *change* - which is the thing worth
+    testing. Call reset() for a clean baseline.
+    """
+    global _override
     _override = size
-    _last_viewport = None
-    _pending = None
 
 
 def viewport():

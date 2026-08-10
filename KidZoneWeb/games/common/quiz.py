@@ -245,7 +245,12 @@ class VoiceQuizGame:
         self.SCALE = clamp(width / self.DESIGN_W, 0.62, 1.35)
         s = self.SCALE
 
-        margin = int(clamp(24 * s, 14, 32))
+        # A rotated phone is wide but very short. Reserving a separate band
+        # for the feedback line there would leave the card almost nothing, so
+        # short layouts overlay it on the card's lower edge instead - the same
+        # trade the hub makes with its compact header.
+        short = height < 420
+        margin = int(clamp((14 if short else 24) * s, 10, 32))
         gap = int(clamp(40 * s, 14, 46))
 
         self.font_word = text.SysFont("arial", int(clamp(40 * s, 22, 46)), bold=True)
@@ -265,7 +270,7 @@ class VoiceQuizGame:
             self.button_palette())
         self.SCORE_POS = (self.home_button.right + int(12 * s),
                           margin + max(0, (home_h - self.font_score.get_height()) // 2))
-        header_bottom = self.home_button.bottom + int(clamp(12 * s, 8, 16))
+        header_bottom = self.home_button.bottom + int(clamp((6 if short else 12) * s, 6, 16))
 
         # --- split what is left between the card and the answer buttons ---
         # Order matters: the card is the question, so it gets a floor and the
@@ -273,7 +278,8 @@ class VoiceQuizGame:
         # height to divide, which is where a fixed design letterboxed instead.
         avail = height - header_bottom - margin
         feedback_h = self.font_feedback.get_height() + int(8 * s)
-        card_gap = int(clamp(16 * s, 10, 22))
+        reserve = 0 if short else feedback_h
+        card_gap = int(clamp((8 if short else 16) * s, 6, 22))
 
         count = self.CHOICES
         btn_w = int((width - margin * 2 - gap * (count - 1)) / count)
@@ -287,48 +293,75 @@ class VoiceQuizGame:
         else:
             btn_h = int(clamp(self.BUTTON_H_RATIO * height, 56, 160))
 
-        card = avail - feedback_h - card_gap - btn_h
+        card = avail - reserve - card_gap - btn_h
         floor = int(avail * 0.42)
         if card < floor:
             # 56 keeps the button comfortably above the 44px touch minimum.
             btn_h = max(56, btn_h - (floor - card))
             if self.BUTTON_SQUARE:
                 btn_w = min(btn_w, btn_h)
-            card = avail - feedback_h - card_gap - btn_h
+            card = avail - reserve - card_gap - btn_h
 
         self.BUTTON_W, self.BUTTON_H = btn_w, btn_h
         self.BUTTON_GAP = gap
         self.BUTTON_Y = height - margin - btn_h
 
         self.FEEDBACK_OFFSET = int(clamp(14 * s, 8, 20)) + feedback_h // 2
-        card = int(clamp(min(width - margin * 2, card), 90, 560))
+        zone_h = self.BUTTON_Y - reserve - card_gap - header_bottom
+        card = int(clamp(min(width - margin * 2, zone_h), 60, 560))
         self.CARD_SIZE = card
         self.card_rect = pygame.Rect(0, 0, card, card)
         self.card_rect.centerx = width // 2
-        self.card_rect.centery = header_bottom + (
-            self.BUTTON_Y - feedback_h - card_gap - header_bottom) // 2
+        # Centred in its zone, but never above it.
+        self.card_rect.top = header_bottom + max(0, (zone_h - card) // 2)
+        if short:
+            # The feedback line sits just inside the card rather than below it.
+            self.FEEDBACK_OFFSET = -feedback_h // 2
 
-        # --- menu and pause screens ---
+        # --- menu and pause screens: stacked, centred, clamped ---
         wide = int(clamp(320 * s, 200, 340))
-        tall = int(clamp(88 * s, 60, 96))
+        tall = int(clamp((64 if short else 88) * s, 56, 96))
+        button_gap = int(clamp(20 * s, 10, 24))
+
+        def stack_top(total):
+            """Top edge that centres `total` px vertically without letting the
+            stack run off a short screen."""
+            return int(clamp((height - total) // 2, margin, max(margin, height - total - margin)))
+
+        title_h = self.font_title.get_height()
+        sub_h = self.font_subtitle.get_height()
+        menu_top = stack_top(title_h + sub_h + button_gap + tall)
+        self.TITLE_Y = menu_top + title_h // 2
+        self.SUBTITLE_Y = menu_top + title_h + sub_h // 2
+        start_y = menu_top + title_h + sub_h + button_gap
         self.start_button = AnswerButton(
-            (width // 2 - wide // 2, int(height * 0.62), wide, tall),
-            "Start", self.button_palette())
+            (width // 2 - wide // 2, start_y, wide, tall), "Start", self.button_palette())
+
+        pause_top = stack_top(title_h + button_gap + tall * 2 + button_gap)
+        self.PAUSED_Y = pause_top + title_h // 2
+        resume_y = pause_top + title_h + button_gap
         self.resume_button = AnswerButton(
-            (width // 2 - wide // 2, int(height * 0.48), wide, tall),
-            "Resume", self.button_palette())
+            (width // 2 - wide // 2, resume_y, wide, tall), "Resume", self.button_palette())
         self.quit_button = AnswerButton(
-            (width // 2 - wide // 2, int(height * 0.48) + tall + int(20 * s), wide, tall),
+            (width // 2 - wide // 2, resume_y + tall + button_gap, wide, tall),
             "Quit", self.button_palette())
-        self.TITLE_Y = int(height * 0.28)
-        self.SUBTITLE_Y = self.TITLE_Y + self.font_title.get_height()
         self.MILESTONE_Y = self.home_button.centery
 
         self.layout_extras()
-        # Buttons already on screen were built for the old geometry.
+        # Buttons already on screen were built for the old geometry. They are
+        # rebuilt rather than just re-rected: a button may have captured
+        # something layout_extras() has just replaced - Math's buttons hold
+        # the apple icon and the numeral font - and moving the rect alone
+        # would leave it drawing the previous size until the next round.
         if self.buttons:
-            for button, rect in zip(self.buttons, self.button_rects(len(self.buttons))):
-                button.rect = rect
+            states = [b.state for b in self.buttons]
+            rects = self.button_rects(len(self.button_values))
+            self.buttons = [
+                self.make_button(rect, value)
+                for rect, value in zip(rects, self.button_values)
+            ]
+            for button, state in zip(self.buttons, states):
+                button.state = state
 
     def button_palette(self):
         return {
@@ -666,7 +699,7 @@ class VoiceQuizGame:
 
         paused = self.font_title.render("Paused", True, (255, 255, 255))
         self.screen.blit(
-            paused, paused.get_rect(center=(self.WIDTH // 2, int(self.HEIGHT * 0.3))))
+            paused, paused.get_rect(center=(self.WIDTH // 2, self.PAUSED_Y)))
 
         self.resume_button.draw(self.screen, self.font_word, mouse_pos)
         self.quit_button.draw(self.screen, self.font_word, mouse_pos)
