@@ -106,9 +106,18 @@ class VoiceQuizGame:
     # "bubbles": bubbles rising over a vertical gradient (needs BG_TOP/BOTTOM).
     BACKGROUND = "shapes"
     BG_SHAPE_COLORS = None    # defaults to CONFETTI_COLORS
+    BG_SHAPE_COUNT = 12
+    BG_SHAPE_RADIUS = (20, 42)
+    BG_SHAPE_ALPHA = 70
+    BG_SHAPE_BOB = 16
     BG_TOP_COLOR = (255, 246, 235)
     BG_BOTTOM_COLOR = (255, 226, 235)
     BUBBLE_COLORS = [(255, 190, 215, 90), (255, 215, 230, 90)]
+    BUBBLE_COUNT = 14
+    BUBBLE_RADIUS = (8, 22)
+    BUBBLE_SPEED = (14, 36)
+    BUBBLE_DRIFT = 10
+    BUBBLE_RING = True        # soft highlight ring; off gives a bokeh glow
     # "burst": upward fan sampled from a timestamp. "confetti": dt-integrated
     # with gravity.
     PARTICLES = "burst"
@@ -135,6 +144,12 @@ class VoiceQuizGame:
     def voice_name(self, item):
         """Clip stem for `item`, when it differs from the item itself."""
         return str(item)
+
+    def correct_value(self):
+        """What a button's value must equal for the tap to be right.
+        Usually the item itself, but Math's buttons hold sums rather than
+        the (a, b) problem being asked."""
+        return self.current
 
     def correct_message(self, item):
         return "Great job!"
@@ -247,19 +262,21 @@ class VoiceQuizGame:
         if self.BACKGROUND == "bubbles":
             self.bg_surface = fx.build_gradient(
                 self.WIDTH, self.HEIGHT, self.BG_TOP_COLOR, self.BG_BOTTOM_COLOR)
-            self.bubbles = [self._make_bubble(initial=True) for _ in range(14)]
+            self.bubbles = [
+                self._make_bubble(initial=True) for _ in range(self.BUBBLE_COUNT)
+            ]
         else:
             palette = self.BG_SHAPE_COLORS or self.CONFETTI_COLORS
             self.bg_decorations = [
                 {
                     "x": random.uniform(40, self.WIDTH - 40),
                     "y": random.uniform(40, self.HEIGHT - 40),
-                    "r": random.randint(20, 42),
+                    "r": random.randint(*self.BG_SHAPE_RADIUS),
                     "speed": random.uniform(0.4, 1.0),
                     "phase": random.uniform(0, math.tau),
                     "color": random.choice(palette),
                 }
-                for _ in range(12)
+                for _ in range(self.BG_SHAPE_COUNT)
             ]
 
     def _make_bubble(self, initial=False):
@@ -267,9 +284,9 @@ class VoiceQuizGame:
             "x": random.uniform(0, self.WIDTH),
             "y": random.uniform(0, self.HEIGHT) if initial
                  else self.HEIGHT + random.uniform(0, 60),
-            "r": random.uniform(8, 22),
-            "speed": random.uniform(14, 36),
-            "drift": random.uniform(-10, 10),
+            "r": random.uniform(*self.BUBBLE_RADIUS),
+            "speed": random.uniform(*self.BUBBLE_SPEED),
+            "drift": random.uniform(-self.BUBBLE_DRIFT, self.BUBBLE_DRIFT),
             "phase": random.uniform(0, math.tau),
             "color": random.choice(self.BUBBLE_COLORS),
         }
@@ -293,16 +310,17 @@ class VoiceQuizGame:
                 r = int(b["r"])
                 s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
                 pygame.draw.circle(s, b["color"], (r, r), r)
-                pygame.draw.circle(s, (255, 255, 255, 130), (r, r), r, width=2)
+                if self.BUBBLE_RING:
+                    pygame.draw.circle(s, (255, 255, 255, 130), (r, r), r, width=2)
                 self.screen.blit(s, (b["x"] - r, b["y"] - r))
             return
 
         self.screen.fill(self.BG_COLOR)
         for deco in self.bg_decorations:
-            bob = math.sin(now / 900 * deco["speed"] + deco["phase"]) * 16
+            bob = math.sin(now / 900 * deco["speed"] + deco["phase"]) * self.BG_SHAPE_BOB
             r = deco["r"]
             surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (*deco["color"][:3], 70), (r, r), r)
+            pygame.draw.circle(surf, (*deco["color"][:3], self.BG_SHAPE_ALPHA), (r, r), r)
             self.screen.blit(surf, (deco["x"] - r, deco["y"] - r + bob))
 
     # ---- particles ----------------------------------------------------
@@ -406,10 +424,11 @@ class VoiceQuizGame:
     def answer(self, button, value):
         """Score one tap and start the feedback window."""
         now = pygame.time.get_ticks()
-        is_correct = value == self.current
+        target = self.correct_value()
+        is_correct = value == target
 
         for b, v in zip(self.buttons, self.button_values):
-            if v == self.current:
+            if v == target:
                 b.state = "correct"
             elif b is button:
                 b.state = "wrong"

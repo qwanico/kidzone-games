@@ -50,7 +50,7 @@ def exercise(module_name):
 
     def tap(correct):
         for button, value in zip(game.buttons, game.button_values):
-            if (value == game.current) is correct:
+            if (value == game.correct_value()) is correct:
                 game.handle_click(button.rect.center)
                 return
 
