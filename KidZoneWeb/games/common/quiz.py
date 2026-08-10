@@ -75,9 +75,13 @@ class VoiceQuizGame:
     WIDTH, HEIGHT = 900, 700
     CARD_SIZE = 300
     CARD_TOP = 70
-    BUTTON_SIZE = 200
+    BUTTON_SIZE = 200         # square answer buttons
+    BUTTON_W = None           # override for wide buttons; defaults to BUTTON_SIZE
+    BUTTON_H = None
     BUTTON_GAP = 60
     BUTTON_Y = 450
+    SCORE_POS = (24, 20)
+    FEEDBACK_OFFSET = 35      # below the card
     CHOICES = 2
     FEEDBACK_MS = 1600
 
@@ -370,12 +374,13 @@ class VoiceQuizGame:
         return shown
 
     def button_rects(self, count):
-        total = self.BUTTON_SIZE * count + self.BUTTON_GAP * (count - 1)
+        w = self.BUTTON_W or self.BUTTON_SIZE
+        h = self.BUTTON_H or self.BUTTON_SIZE
+        total = w * count + self.BUTTON_GAP * (count - 1)
         start_x = (self.WIDTH - total) // 2
-        step = self.BUTTON_SIZE + self.BUTTON_GAP
+        step = w + self.BUTTON_GAP
         return [
-            pygame.Rect(start_x + i * step, self.BUTTON_Y,
-                        self.BUTTON_SIZE, self.BUTTON_SIZE)
+            pygame.Rect(start_x + i * step, self.BUTTON_Y, w, h)
             for i in range(count)
         ]
 
@@ -511,15 +516,18 @@ class VoiceQuizGame:
 
         score_surf = self.font_score.render(
             f"Score: {self.score}   Streak: {self.streak}", True, self.SCORE_COLOR)
-        self.screen.blit(score_surf, (24, 20))
+        self.screen.blit(score_surf, self.SCORE_POS)
 
         self.pause_button.draw(self.screen, self.font_icon, mouse_pos)
-        draw_home_icon(self.screen, self.home_button, self.BUTTON_COLOR)
+        draw_home_icon(self.screen, self.home_button, self.BUTTON_COLOR,
+                       self.home_button.collidepoint(mouse_pos))
 
         if self.feedback_text and now < self.feedback_until:
             fb = self.font_feedback.render(self.feedback_text, True, self.feedback_color)
             self.screen.blit(
-                fb, fb.get_rect(center=(self.WIDTH // 2, self.card_rect.bottom + 35)))
+                fb, fb.get_rect(
+                    center=(self.WIDTH // 2,
+                            self.card_rect.bottom + self.FEEDBACK_OFFSET)))
 
         if self.milestone_text:
             self.draw_milestone()
