@@ -7,6 +7,11 @@ __pycache__/
 build/
 progress.json
 voice_cache/
+# ...except the web build's, which is not a cache: the browser bundle has no
+# way to regenerate these at runtime, so leaving them untracked shipped eight
+# games that raised "Need at least 2 ... in voice_cache/" the moment a child
+# opened them.
+!KidZoneWeb/games/*_assets/voice_cache/
 tile_cache/
 .claude/settings.local.json
 .wrangler/
