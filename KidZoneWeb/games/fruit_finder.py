@@ -415,8 +415,10 @@ wrong_sound = pygame.mixer.Sound(str(SOUNDS_DIR / "wrong.ogg"))
 # kept low by default so they don't drown out the "Find the X" voice line
 # that speaks over them once the next round starts (the applause clip
 # especially, since it runs long at 4.5s).
+# Short chimes only. The old correct.ogg was a 4.5s applause clip - far too
+# long and too loud for a per-answer cue, and it overlapped the next spoken
+# prompt. Removed from the pool entirely.
 correct_sounds = [
-    pygame.mixer.Sound(str(SOUNDS_DIR / "correct.ogg")),
     pygame.mixer.Sound(str(SOUNDS_DIR / "chime1.ogg")),
     pygame.mixer.Sound(str(SOUNDS_DIR / "chime2.ogg")),
 ]

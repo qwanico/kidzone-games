@@ -1217,6 +1217,13 @@ async def main():
     confirm_reset = False
     running = True
     last_viewport_check = 0
+    # pygbag sizes the canvas from the *current* backing store. Right after a
+    # set_mode() that store may still be the previous size (a game's 900x700
+    # landscape), so a single resize_window() call there fits the CSS box to
+    # the wrong aspect and the hub renders as a band with dead space around
+    # it. Re-run it for a few frames, once real frames have been presented at
+    # the new size.
+    resize_frames_left = 0
     # Scroll offsets persist across a rebuild (clamped to the new content
     # height below) so a rotation doesn't fling the child back to the top.
     scroll = 0
@@ -1239,6 +1246,7 @@ async def main():
 
         screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
         resize_window()
+        resize_frames_left = 8
         pygame.display.set_caption("Kid Zone")
         clock = pygame.time.Clock()
         load_images()
@@ -1552,6 +1560,7 @@ async def main():
                                         (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE
                                     )
                                     resize_window()
+                                    resize_frames_left = 8
                                     pygame.display.set_caption("Kid Zone")
                                     load_images()
                                 dragging = False
@@ -1572,6 +1581,7 @@ async def main():
                                             (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE
                                         )
                                         resize_window()
+                                        resize_frames_left = 8
                                         pygame.display.set_caption("Kid Zone")
                                         load_images()
                                     break
@@ -1954,6 +1964,11 @@ async def main():
                     pending_viewport = None
 
             pygame.display.flip()
+
+            if resize_frames_left > 0:
+                resize_frames_left -= 1
+                resize_window()
+
             clock.tick(60)
             await asyncio.sleep(0)
 
