@@ -396,7 +396,12 @@ class VoiceQuizGame:
         self.milestone_text = ""
         self.milestone_until = 0
 
+        self.on_new_round()
         self.speak(self.current)
+
+    def on_new_round(self):
+        """After the round is dealt and before the clip plays. Games with a
+        per-item animation restart it here."""
 
     def answer(self, button, value):
         """Score one tap and start the feedback window."""
