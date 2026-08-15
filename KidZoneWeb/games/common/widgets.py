@@ -98,6 +98,7 @@ class AnswerButton:
         pygame.draw.rect(surface, color, self.rect, border_radius=self.radius)
         pygame.draw.rect(surface, WHITE, self.rect, width=3, border_radius=self.radius)
         self.draw_face(surface, font, mouse_pos)
+        self.draw_state_badge(surface)
 
     def draw_face(self, surface, font, mouse_pos):
         """What sits inside the button. Subclasses that answer with a picture
@@ -105,3 +106,31 @@ class AnswerButton:
         and keep the shared frame and its correct/wrong states."""
         text_surf = font.render(self.label, True, WHITE)
         surface.blit(text_surf, text_surf.get_rect(center=self.rect.center))
+
+    def draw_state_badge(self, surface):
+        """A check or X on top of the correct/wrong fill, so the result does
+        not depend on color alone - sfx.py's good()/bad() already exists for
+        the same reason on the audio side (a grey rock read as just another
+        star to a colorblind child), but nothing gave the visual side the
+        matching fix. Badge sits in the corner rather than over the label so
+        it reads as an addition, not a replacement, of what was already there.
+        """
+        if self.state not in ("correct", "wrong"):
+            return
+        size = min(self.rect.width, self.rect.height) * 0.3
+        r = size * 0.6
+        cx = self.rect.right - size * 0.7
+        cy = self.rect.top + size * 0.7
+        pygame.draw.circle(surface, WHITE, (cx, cy), r)
+        color = self.palette["correct" if self.state == "correct" else "wrong"]
+        pygame.draw.circle(surface, color, (cx, cy), r, width=max(2, int(r * 0.18)))
+        w = max(2, int(r * 0.28))
+        if self.state == "correct":
+            pygame.draw.lines(surface, color, False, [
+                (cx - r * 0.45, cy),
+                (cx - r * 0.1, cy + r * 0.4),
+                (cx + r * 0.45, cy - r * 0.35),
+            ], width=w)
+        else:
+            pygame.draw.line(surface, color, (cx - r * 0.4, cy - r * 0.4), (cx + r * 0.4, cy + r * 0.4), width=w)
+            pygame.draw.line(surface, color, (cx - r * 0.4, cy + r * 0.4), (cx + r * 0.4, cy - r * 0.4), width=w)

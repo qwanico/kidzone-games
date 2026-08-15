@@ -9,7 +9,7 @@
 #   ./deploy.sh --production     build + deploy to production (branch main)
 #   ./deploy.sh --branch NAME    build + deploy a named preview branch
 #
-# Three things this encodes, each of which has broken a deploy before:
+# Four things this encodes, each of which has broken a deploy before:
 #
 #   * pygbag resolves default.tmpl relative to the *current directory*, not
 #     the app directory. Building from the parent silently swaps the project's
@@ -22,6 +22,10 @@
 #   * The .apk is only ever fetched by the loader on .itch.zone hosts; on
 #     Pages the browser reads the .tar.gz. Uploading it wasted several MB per
 #     deploy, so it is deliberately left out of the staging directory.
+#   * Nothing used to run tests/quiz_behaviour.py before shipping, so a change
+#     to the shared quiz framework could break all eight games on it and only
+#     surface once a child hit the broken screen. It runs here, before either
+#     app is built, and aborts the deploy on any failure.
 #
 set -euo pipefail
 
@@ -40,6 +44,14 @@ while [ $# -gt 0 ]; do
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
+
+run_tests() {
+    echo "==> running tests/quiz_behaviour.py"
+    if ! "$PYTHON" "$REPO/tests/quiz_behaviour.py"; then
+        echo "ABORT: quiz behaviour tests failed - fix them before deploying." >&2
+        exit 1
+    fi
+}
 
 build() {  # build <app-dir> <archive-name> <min-entries>
     local dir="$1" archive="$2" min="$3"
@@ -66,6 +78,8 @@ stage() {  # stage <app-dir> <archive-name> <destination>
        "$REPO/$dir/build/web/favicon.png" \
        "$REPO/$dir/build/web/$archive.tar.gz" "$dest/"
 }
+
+run_tests
 
 build KidZoneWeb kidzoneweb 400
 build ArcadeWeb arcadeweb 40
