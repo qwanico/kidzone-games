@@ -115,6 +115,26 @@ class Game(VoiceQuizGame):
             pygame.image.load(str(ASSETS_DIR / "apple.png")).convert_alpha()
         self.fruit_icon = pygame.transform.smoothscale(self._raw_fruit, (icon, icon))
 
+        # A small apple cluster above each operand in the equation itself,
+        # so "2 + 3" reads as two-apples-plus-three-apples before a child
+        # can even read the numerals - same idea as the answer buttons,
+        # just sized to fit the sliver of card above the equation text.
+        # eq_icon_gap is subtracted here *and* used again in draw_prompt() to
+        # place the cluster, so the two agree on how much room it needs -
+        # sizing it against one margin and positioning it against another
+        # let the cluster poke out above the card on short/cramped layouts.
+        self.eq_icon_gap = int(clamp(8 * self.SCALE, 4, 12))
+        eq_h = self.font_equation.get_height()
+        eq_top = self.card_rect.centery - 45 - eq_h // 2
+        avail_h = eq_top - self.card_rect.top - self.eq_icon_gap
+        eq_icon = int(clamp(min(avail_h, self.CARD_SIZE * 0.08), 0, 22))
+        if eq_icon >= 8:
+            self.eq_icon_size = eq_icon
+            self.eq_fruit_icon = pygame.transform.smoothscale(self._raw_fruit, (eq_icon, eq_icon))
+        else:
+            self.eq_icon_size = 0
+            self.eq_fruit_icon = None
+
     def load_items(self):
         available = self.available_voices()
         return [
@@ -194,12 +214,35 @@ class Game(VoiceQuizGame):
     def draw_prompt(self, surface, rect, revealed):
         a, b = self.current
         if revealed:
-            equation, color = f"{a} + {b} = {self.current_sum}", self.feedback_color
+            parts = [str(a), " + ", str(b), " = ", str(self.current_sum)]
+            color = self.feedback_color
         else:
-            equation, color = f"{a} + {b} = ?", TEXT_COLOR
+            parts = [str(a), " + ", str(b), " = ", "?"]
+            color = TEXT_COLOR
 
-        eq = self.font_equation.render(equation, True, color)
-        surface.blit(eq, eq.get_rect(center=(rect.centerx, rect.centery - 45)))
+        # Rendered segment-by-segment (rather than as one string) so each
+        # operand's screen position is known and an apple cluster can be
+        # pinned directly above it.
+        widths = [self.font_equation.size(p)[0] for p in parts]
+        eq_y = rect.centery - 45
+        x = rect.centerx - sum(widths) // 2
+        centers = []
+        for part, w in zip(parts, widths):
+            seg = self.font_equation.render(part, True, color)
+            surface.blit(seg, seg.get_rect(midleft=(x, eq_y)))
+            centers.append(x + w / 2)
+            x += w
+
+        if self.eq_icon_size:
+            icon_gap = max(3, int(4 * self.SCALE))
+            eq_top = eq_y - self.font_equation.get_height() // 2
+            for count, cx in ((a, centers[0]), (b, centers[2])):
+                cluster_w = count * self.eq_icon_size + (count - 1) * icon_gap
+                area = pygame.Rect(0, 0, cluster_w, self.eq_icon_size)
+                area.centerx = int(cx)
+                area.bottom = eq_top - self.eq_icon_gap
+                for ix, iy in fruit_grid_positions(count, area, self.eq_icon_size):
+                    surface.blit(self.eq_fruit_icon, (ix, iy))
 
         now = pygame.time.get_ticks()
         pulse = (math.sin(now / 200) + 1) / 2 if not revealed else 0.0
