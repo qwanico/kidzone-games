@@ -57,6 +57,7 @@ from . import display
 from . import fx
 from . import text
 from .audio import VoicePlayer
+from .storage import KeyValueStore
 from .widgets import AnswerButton, draw_home_icon, draw_speaker_icon
 
 STATE_MENU = "menu"
@@ -71,6 +72,15 @@ DEFAULT_CONFETTI = [
     (255, 99, 132), (255, 205, 86), (75, 192, 192),
     (54, 162, 235), (153, 102, 255), (255, 159, 64),
 ]
+
+# One shared preference across all eight games rather than eight separate
+# settings - a "harder mode" toggle a parent sets once, not eight menus to
+# remember. Easy keeps CHOICES at the class default (2), so a child already
+# playing today sees no change unless someone deliberately picks a harder
+# level. More choices is the whole lever: these are untimed, self-paced quiz
+# rounds, so a countdown would be a stress mechanic, not a difficulty one.
+DIFFICULTY_LEVELS = [("easy", "Easy"), ("normal", "Normal"), ("hard", "Hard")]
+DIFFICULTY_CHOICES = {"easy": 2, "normal": 3, "hard": 4}
 
 
 class VoiceQuizGame:
@@ -175,6 +185,12 @@ class VoiceQuizGame:
         pygame.init()
         pygame.mixer.init()
         self.voice = VoicePlayer(self.VOICE_DIR)
+
+        self._difficulty_store = KeyValueStore("kidzone-quiz-difficulty")
+        self.difficulty = self._difficulty_store.load({"level": "easy"})["level"]
+        if self.difficulty not in DIFFICULTY_CHOICES:
+            self.difficulty = "easy"
+        self.CHOICES = DIFFICULTY_CHOICES[self.difficulty]
 
         width, height = self.viewport_size()
         self.screen = pygame.display.set_mode(
@@ -328,14 +344,46 @@ class VoiceQuizGame:
             stack run off a short screen."""
             return int(clamp((height - total) // 2, margin, max(margin, height - total - margin)))
 
+        # Difficulty row: three small pills under Start. Its own height is
+        # folded into stack_top()'s total so the whole menu - title, Start,
+        # difficulty - stays one centred, clamped group instead of the row
+        # tacking on below whatever space happened to be left. On an
+        # extremely short/wide layout there just isn't room for a fourth
+        # row without crowding or clipping something else, so it is dropped
+        # entirely there - the persisted difficulty still applies, it is
+        # just not changeable from that particular screen size.
+        diff_w = int(clamp(96 * s, 66, 112))
+        diff_h = int(clamp(38 * s, 44, 46))  # 44px floor: the project's tap-target minimum
+        diff_gap = int(clamp(10 * s, 6, 14))
+        diff_label_h = self.font_icon.get_height() + int(4 * s)
+        diff_row_w = diff_w * 3 + diff_gap * 2
+        diff_extra = button_gap + diff_label_h + diff_h
+
         title_h = self.font_title.get_height()
         sub_h = self.font_subtitle.get_height()
-        menu_top = stack_top(title_h + sub_h + button_gap + tall)
+        base_total = title_h + sub_h + button_gap + tall
+        show_difficulty = base_total + diff_extra <= height - 2 * margin
+        menu_top = stack_top(base_total + diff_extra if show_difficulty else base_total)
         self.TITLE_Y = menu_top + title_h // 2
         self.SUBTITLE_Y = menu_top + title_h + sub_h // 2
         start_y = menu_top + title_h + sub_h + button_gap
         self.start_button = AnswerButton(
             (width // 2 - wide // 2, start_y, wide, tall), "Start", self.button_palette())
+
+        if show_difficulty:
+            self.DIFFICULTY_LABEL_Y = start_y + tall + button_gap + diff_label_h // 2
+            diff_y = start_y + tall + button_gap + diff_label_h
+            diff_x = width // 2 - diff_row_w // 2
+            self.difficulty_buttons = {
+                level: AnswerButton(
+                    (diff_x + i * (diff_w + diff_gap), diff_y, diff_w, diff_h),
+                    label, self.button_palette(), radius=14)
+                for i, (level, label) in enumerate(DIFFICULTY_LEVELS)
+            }
+            for level, button in self.difficulty_buttons.items():
+                button.state = "correct" if level == self.difficulty else "idle"
+        else:
+            self.difficulty_buttons = {}
 
         pause_top = stack_top(title_h + button_gap + tall * 2 + button_gap)
         self.PAUSED_Y = pause_top + title_h // 2
@@ -591,6 +639,21 @@ class VoiceQuizGame:
     def handle_menu_click(self, pos):
         if self.start_button.rect.collidepoint(pos):
             self.start_game()
+            return
+        for level, button in self.difficulty_buttons.items():
+            if button.rect.collidepoint(pos):
+                self.set_difficulty(level)
+                return
+
+    def set_difficulty(self, level):
+        if level == self.difficulty or level not in DIFFICULTY_CHOICES:
+            return
+        self.difficulty = level
+        self._difficulty_store.save({"level": level})
+        self.CHOICES = DIFFICULTY_CHOICES[level]
+        # Re-derive BUTTON_W/gap for the new choice count and refresh which
+        # pill shows selected - cheap, and only ever runs from the menu.
+        self.layout(self.WIDTH, self.HEIGHT)
 
     def handle_pause_click(self, pos):
         if self.home_button.collidepoint(pos):
@@ -642,6 +705,13 @@ class VoiceQuizGame:
             sub_surf, sub_surf.get_rect(center=(self.WIDTH // 2, self.SUBTITLE_Y)))
 
         self.start_button.draw(self.screen, self.font_word, mouse_pos)
+
+        if self.difficulty_buttons:
+            label_surf = self.font_icon.render("Difficulty", True, self.TEXT_COLOR)
+            self.screen.blit(
+                label_surf, label_surf.get_rect(center=(self.WIDTH // 2, self.DIFFICULTY_LABEL_Y)))
+            for button in self.difficulty_buttons.values():
+                button.draw(self.screen, self.font_icon, mouse_pos)
 
     def draw_card(self, mouse_pos):
         rect = self.card_rect

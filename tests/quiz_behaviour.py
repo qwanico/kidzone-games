@@ -58,6 +58,7 @@ def check_geometry(results, game, where):
         "resume": game.resume_button.rect,
         "quit": game.quit_button.rect,
         **{f"button{i}": b.rect for i, b in enumerate(game.buttons)},
+        **{f"difficulty-{level}": b.rect for level, b in game.difficulty_buttons.items()},
     }
     for name, rect in rects.items():
         check(results, f"{where}: {name} is on screen", screen.contains(rect))
@@ -67,6 +68,17 @@ def check_geometry(results, game, where):
               button.rect.width >= 44 and button.rect.height >= 44)
         check(results, f"{where}: button{i} clear of the card",
               not button.rect.colliderect(game.card_rect))
+
+    diff_rects = [b.rect for b in game.difficulty_buttons.values()]
+    for level, button in game.difficulty_buttons.items():
+        check(results, f"{where}: difficulty-{level} is tappable (>=44px)",
+              button.rect.width >= 44 and button.rect.height >= 44)
+    for i, a in enumerate(diff_rects):
+        for b in diff_rects[i + 1:]:
+            check(results, f"{where}: difficulty pills do not overlap",
+                  not a.colliderect(b))
+        check(results, f"{where}: difficulty pill clear of Start",
+              not a.colliderect(game.start_button.rect))
 
     if len(game.buttons) == 2:
         check(results, f"{where}: answer buttons do not overlap",
@@ -116,10 +128,25 @@ def exercise(module_name):
     game = importlib.import_module(module_name).Game()
 
     check(results, "starts on the menu", game.state == "menu")
+    check(results, "defaults to easy (2 choices)",
+          game.difficulty == "easy" and game.CHOICES == 2)
+    check_geometry(results, game, "menu")
+
+    game.handle_menu_click(game.difficulty_buttons["hard"].rect.center)
+    check(results, "tapping Hard selects it", game.difficulty == "hard")
+    check(results, "hard raises CHOICES to 4", game.CHOICES == 4)
+    check_geometry(results, game, "menu, hard selected")
+
     game.handle_menu_click(game.start_button.rect.center)
     check(results, "Start begins play", game.state == "playing")
     check(results, "a round is dealt",
           game.current is not None and len(game.buttons) >= 2)
+    check(results, "hard round deals up to 4 choices",
+          len(game.buttons) == min(4, len(game.items)))
+
+    # Reset to the default so every other test in this run - and the next
+    # process, since difficulty persists - is not left on "hard" by this one.
+    game._difficulty_store.save({"level": "easy"})
 
     # Drawing is where the migration actually moved code - custom button
     # faces, the card, both draw_prompt branches. None of it raises until
