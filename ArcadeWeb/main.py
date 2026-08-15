@@ -318,8 +318,13 @@ def go_to_kidzone():
 
 async def main():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Arcade")
+    if platform is not None and hasattr(platform, "window"):
+        try:
+            platform.window.window_resize()
+        except Exception:
+            pass
     clock = pygame.time.Clock()
     load_images()
 
@@ -403,8 +408,13 @@ async def main():
                     for card in cards:
                         if card.is_hovered(tap_pos):
                             await launch_game(card.game)
-                            screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+                            screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
                             pygame.display.set_caption("Arcade")
+                            if platform is not None and hasattr(platform, "window"):
+                                try:
+                                    platform.window.window_resize()
+                                except Exception:
+                                    pass
                             load_images()
                             break
                 dragging = False

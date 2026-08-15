@@ -251,7 +251,7 @@ class Bug:
 
 async def run():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     if platform is not None and hasattr(platform, "window"):
         try:
             platform.window.window_resize()

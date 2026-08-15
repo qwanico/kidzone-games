@@ -1878,7 +1878,7 @@ async def run():
     # with whatever plays next.
     music_channel = background_music.play(loops=-1)
 
-    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
     if platform is not None and hasattr(platform, "window"):
         try:
             platform.window.window_resize()
