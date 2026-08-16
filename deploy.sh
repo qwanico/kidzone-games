@@ -22,10 +22,11 @@
 #   * The .apk is only ever fetched by the loader on .itch.zone hosts; on
 #     Pages the browser reads the .tar.gz. Uploading it wasted several MB per
 #     deploy, so it is deliberately left out of the staging directory.
-#   * Nothing used to run tests/quiz_behaviour.py before shipping, so a change
-#     to the shared quiz framework could break all eight games on it and only
-#     surface once a child hit the broken screen. It runs here, before either
-#     app is built, and aborts the deploy on any failure.
+#   * Nothing used to run the test suite before shipping, so a change could
+#     break games and only surface once a child hit the broken screen. Both
+#     tests/quiz_behaviour.py (the eight shared-framework games, deeply) and
+#     tests/game_smoke.py (the other 31, for crash-on-boot only) run here,
+#     before either app is built, and abort the deploy on any failure.
 #
 set -euo pipefail
 
@@ -49,6 +50,11 @@ run_tests() {
     echo "==> running tests/quiz_behaviour.py"
     if ! "$PYTHON" "$REPO/tests/quiz_behaviour.py"; then
         echo "ABORT: quiz behaviour tests failed - fix them before deploying." >&2
+        exit 1
+    fi
+    echo "==> running tests/game_smoke.py"
+    if ! "$PYTHON" "$REPO/tests/game_smoke.py"; then
+        echo "ABORT: a game crashed on boot - fix it before deploying." >&2
         exit 1
     fi
 }

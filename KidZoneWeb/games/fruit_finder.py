@@ -1917,13 +1917,16 @@ async def run():
 
             if event.type == pygame.KEYDOWN:
 
+                # Every other game in KidZone quits to the hub on Escape,
+                # unconditional on any menu/paused state - this one used to
+                # be the sole exception, toggling pause instead and leaving
+                # keyboard users with no way back at all from the menu,
+                # settings or achievements screens. Pausing already has its
+                # own dedicated on-screen button, so nothing is lost by
+                # matching the platform-wide convention here too.
                 if event.key == pygame.K_ESCAPE:
 
-                    if game_state == "playing":
-                        game_state = "paused"
-
-                    elif game_state == "paused":
-                        game_state = "playing"
+                    running = False
 
 
 
