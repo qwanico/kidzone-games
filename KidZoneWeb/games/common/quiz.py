@@ -55,6 +55,7 @@ import pygame
 
 from . import display
 from . import fx
+from . import sfx
 from . import text
 from .audio import VoicePlayer
 from .storage import KeyValueStore
@@ -474,7 +475,10 @@ class VoiceQuizGame:
         }
 
     def update_background(self, dt_ms):
-        if self.BACKGROUND != "bubbles":
+        # Continuous ambient motion - not the brief correct/wrong particle
+        # bursts, which are meaningful feedback rather than decoration - is
+        # exactly what a reduced-motion preference exists to turn off.
+        if self.BACKGROUND != "bubbles" or sfx.is_reduced_motion():
             return
         dt = dt_ms / 1000
         now = pygame.time.get_ticks() / 1000
@@ -498,8 +502,10 @@ class VoiceQuizGame:
             return
 
         self.screen.fill(self.BG_COLOR)
+        reduced_motion = sfx.is_reduced_motion()
         for deco in self.bg_decorations:
-            bob = math.sin(now / 900 * deco["speed"] + deco["phase"]) * self.BG_SHAPE_BOB
+            bob = 0 if reduced_motion else (
+                math.sin(now / 900 * deco["speed"] + deco["phase"]) * self.BG_SHAPE_BOB)
             r = deco["r"]
             surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
             pygame.draw.circle(surf, (*deco["color"][:3], self.BG_SHAPE_ALPHA), (r, r), r)

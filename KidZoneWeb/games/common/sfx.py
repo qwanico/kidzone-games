@@ -1,4 +1,4 @@
-"""Shared sound effects, and the global mute.
+"""Shared sound effects, and the global accessibility toggles.
 
 Seven of the arcade games shipped with no audio at all - `grep mixer` returned
 nothing for balloon_pop, bug_squasher, whack_a_mole, fish_catch, jumping_jack,
@@ -8,8 +8,9 @@ among balloons), a child who tapped a hazard got no feedback in any modality
 except a colour change and a decremented life counter. That is a real problem
 for a pre-reader or a colour-blind child.
 
-The mute flag lives in the same browser localStorage the hub uses, so a parent
-can silence the whole app from one place and it survives a reload.
+Mute and reduced motion live in the same browser localStorage blob the hub
+uses, so a parent sets each once from Parent Settings and it survives a
+reload - and applies everywhere, not just in whichever game was open.
 """
 
 from pathlib import Path
@@ -23,7 +24,7 @@ except ImportError:  # standalone run
 
 SOUNDS_DIR = Path(__file__).parent / "sounds"
 SETTINGS_KEY = "kidzone_settings"
-DEFAULT_SETTINGS = {"muted": False}
+DEFAULT_SETTINGS = {"muted": False, "reduced_motion": False}
 
 _store = KeyValueStore(SETTINGS_KEY)
 _settings = None
@@ -56,6 +57,21 @@ def set_muted(value):
 def toggle_muted():
     set_muted(not is_muted())
     return is_muted()
+
+
+def is_reduced_motion():
+    return bool(_load().get("reduced_motion", False))
+
+
+def set_reduced_motion(value):
+    s = _load()
+    s["reduced_motion"] = bool(value)
+    _store.save(s)
+
+
+def toggle_reduced_motion():
+    set_reduced_motion(not is_reduced_motion())
+    return is_reduced_motion()
 
 
 def _sound(name):

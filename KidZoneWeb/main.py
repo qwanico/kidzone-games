@@ -1407,15 +1407,20 @@ async def main():
         badge_rows = [
             ACHIEVEMENTS[i:i + badges_per_row] for i in range(0, len(ACHIEVEMENTS), badges_per_row)
         ]
-        # Global mute lives here so a parent has one place to silence the app.
+        # Global mute and reduced motion live here so a parent has one place
+        # to set each for the whole app, not per game.
         SET_MUTE_Y = SET_GAMES_Y + int(clamp(34 * SCALE, 26, 40))
         mute_btn_w = int(clamp(230 * SCALE, 180, 230))
         mute_btn_h = int(clamp(48 * SCALE, 40, 48))
         mute_rect_content = pygame.Rect(0, 0, mute_btn_w, mute_btn_h)
         mute_rect_content.center = (WIDTH // 2, SET_MUTE_Y + mute_btn_h // 2)
 
+        SET_MOTION_Y = SET_MUTE_Y + mute_btn_h + int(clamp(12 * SCALE, 8, 16))
+        motion_rect_content = pygame.Rect(0, 0, mute_btn_w, mute_btn_h)
+        motion_rect_content.center = (WIDTH // 2, SET_MOTION_Y + mute_btn_h // 2)
+
         badge_start_y = (
-            SET_MUTE_Y + mute_btn_h + int(clamp(40 * SCALE, 30, 50)) + badge_radius
+            SET_MOTION_Y + mute_btn_h + int(clamp(40 * SCALE, 30, 50)) + badge_radius
         )
         badge_positions = []
         for row_index, row in enumerate(badge_rows):
@@ -1575,6 +1580,13 @@ async def main():
                             ).collidepoint(event.pos)
                         ):
                             sfx.toggle_muted()
+                        elif (
+                            settings_band_rect.collidepoint(event.pos)
+                            and motion_rect_content.move(
+                                0, SETTINGS_SCROLL_TOP - settings_scroll
+                            ).collidepoint(event.pos)
+                        ):
+                            sfx.toggle_reduced_motion()
                         elif settings_band_rect.collidepoint(event.pos) and settings_max_scroll > 0:
                             # Drag-to-scroll: only starts inside the band, so it
                             # can never swallow a tap on the fixed back/footer
@@ -1825,6 +1837,18 @@ async def main():
                     INK_SOFT_COLOR if muted_now else TEAL_COLOR,
                     INK_COLOR if muted_now else TEAL_DEEP_COLOR,
                     mute_hovered,
+                )
+
+                motion_rect = motion_rect_content.move(0, content_dy)
+                reduced_motion_now = sfx.is_reduced_motion()
+                motion_hovered = motion_rect.collidepoint(mouse_pos)
+                draw_button(
+                    screen, motion_rect,
+                    "Motion: Less" if reduced_motion_now else "Motion: Normal",
+                    button_font,
+                    INK_SOFT_COLOR if reduced_motion_now else TEAL_COLOR,
+                    INK_COLOR if reduced_motion_now else TEAL_DEEP_COLOR,
+                    motion_hovered,
                 )
 
                 for achievement, center in badge_positions:
