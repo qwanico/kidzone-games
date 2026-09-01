@@ -1,7 +1,8 @@
 # The Engineer's Journey
 
-A long-form mentorship campaign run inside this repository. The codebase is the
-game world: every quest touches real code that real children play.
+A long-form mentorship campaign. All work happens in `dojo/`, written from
+scratch. The existing games in this repository are **out of scope** by the
+learner's decision - nothing in `dojo/` reads, imports, or builds on them.
 
 ## Character Sheet
 
@@ -19,23 +20,27 @@ Principal Engineer -> Software Wizard  *(500 XP per rank)*
 
 ### Strengths observed
 
-- Ships. 45 commits, 46,598 lines of working Python, ~40 playable games.
-- Recognises duplication as a cost. The `games/common` extraction is a real
-  engineering instinct, not a tutorial exercise.
-- Writes honest commit messages that explain *why*, not just *what*.
+- Ships finished, working software rather than abandoning half-projects.
+- Chose a clean slate over inheriting code he did not write line by line.
+  Wanting to own every line is the correct instinct for learning.
 
 ### Weaknesses to attack
 
-- **Zero automated tests** across 46,598 lines. Every regression is found by a
-  child, not by a machine. This is the campaign's first dragon.
-- Correctness currently rests on manual play-testing, so refactors are scary.
-- Untested code cannot be safely refactored, which caps every later level.
+- Unproven from first principles. The campaign starts at Level 1 and builds
+  up, so every concept is earned rather than assumed.
 
-## Quest Log
+## The Arc: build a battle system from zero
 
-| # | Quest | Type | XP | Status |
+Each quest adds one system, in roadmap order. They compose into a complete,
+playable game that is entirely the learner's own work.
+
+| # | Quest | Teaches | XP | Status |
 |---|---|---|---|---|
-| 1 | The Untested Kingdom | Testing | 100 | **ACTIVE** |
+| 1 | The Damage Formula | functions, return values, branching | 100 | **ACTIVE** |
+| 2 | The Character Sheet | dictionaries | 100 | locked |
+| 3 | The Battle Loop | loops, state | 150 | locked |
+| 4 | The Refactor | classes | 150 | locked |
+| 5 | The Save File | file handling | 150 | locked |
 
 ## Field Notes
 
